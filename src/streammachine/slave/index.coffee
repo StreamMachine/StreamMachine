@@ -5,16 +5,18 @@ Server = require "./server"
 
 Socket = require "socket.io-client"
 
+URL = require "url"
+HTTP = require "http"
+
 module.exports = class Slave extends require("events").EventEmitter
     DefaultOptions:
-        foo: "bar"
         max_zombie_life:    1000 * 60 * 60
         
     Outputs:
-        pumper:     require("../outputs/pumper")
-        shoutcast:  require("../outputs/shoutcast")
-        mp3:        require("../outputs/livemp3")
-        sockets:    require("../outputs/sockets")
+        pumper:     require "../outputs/pumper"
+        shoutcast:  require "../outputs/shoutcast"
+        raw:        require "../outputs/raw_audio"
+        sockets:    require "../outputs/sockets"
         
     constructor: (opts) ->
         @options = _u.defaults opts||{}, @DefaultOptions
@@ -49,7 +51,6 @@ module.exports = class Slave extends require("events").EventEmitter
             
         # init our server
         @server = new Server core:@
-        #@server.listen @options.listen
             
         @log.debug "Slave is listening on port #{@options.listen}"
         
@@ -77,11 +78,25 @@ module.exports = class Slave extends require("events").EventEmitter
             @master?.emit "listeners", counts:counts, total:total
 
         , 30 * 1000
+        
+        # -- Buffer Stats -- #
+        
+        @_buffer_interval = setInterval =>
+            return if !@connected?
+            
+            counts = []
+            for k,s of @streams
+                counts.push [s.key,s._rbuffer?.length].join(":")
+                
+            @log.debug "Rewind buffers: " + counts.join(" -- ")
+            
+        , 5 * 1000
                             
         # -- Graceful Shutdown -- #
         
         # attach a USR2 handler that causes us to stop listening. this is 
         # used to allow a new server to start up
+
         process.on "SIGTERM", =>
             @log.debug "Got SIGTERM in core...  Starting shutdown"
             
@@ -131,9 +146,9 @@ module.exports = class Slave extends require("events").EventEmitter
             else
                 console.log "got connection error of ", err
             
-        @master.on "streams", (config) =>
-            console.log "got streams config of ", config
-            @configureStreams config
+        @master.on "config", (config) =>
+            console.log "got config of ", config
+            @configureStreams config.streams
                 
         @master.on "disconnect", =>
             @_onDisconnect()
@@ -154,9 +169,6 @@ module.exports = class Slave extends require("events").EventEmitter
             @log.debug "Connected to master."
             @log.proxyToMaster @master
         
-        # start listening
-        #@server.listen @options.listen
-        
         true
         
     _onDisconnect: ->
@@ -165,7 +177,7 @@ module.exports = class Slave extends require("events").EventEmitter
         @server?.stopListening()
         
         @log.proxyToMaster()
-        
+                
         true
     
     #----------
@@ -173,8 +185,6 @@ module.exports = class Slave extends require("events").EventEmitter
     configureStreams: (options) ->
         @log.debug "In slave configureStreams with ", options:options
 
-        # -- Sources -- #
-        
         # are any of our current streams missing from the new options? if so, 
         # disconnect them
         for k,obj in @streams
@@ -196,31 +206,106 @@ module.exports = class Slave extends require("events").EventEmitter
                 slog = @log.child stream:key
                 @streams[key] = new Stream @, key, slog, opts
                                 
-                if @master
-                    source = new Slave.SocketSource master:@master, key:key, log:slog
-                    @streams[key].useSource(source)
-                
             # should this stream accept requests to /?
             if opts.root_route
                 @root_route = key
     
     #----------
     
+    socketSource: (stream) ->
+        new Slave.SocketSource @, stream
+    
+    #----------
+    
+    sendHandoffData: (translator,cb) ->
+        # need to transfer listeners and their offsets to the new process
+        
+        @log.info "Sending slave handoff data."
+        
+        fFunc = _u.after Object.keys(@streams).length, =>
+            @log.info "Listeners sent."
+            cb? null
+        
+        sFunc = (stream) =>
+            @log.info "Sending #{ Object.keys(stream._lmeta).length } listeners for #{ stream.key }."
+            
+            sfFunc = _u.after Object.keys(stream._lmeta).length, =>
+                fFunc()
+                
+            for id,l of stream._lmeta
+                l.obj.prepForHandoff =>
+                    translator.send "stream_listener",
+                        stream:     stream.key
+                        id:         id
+                        startTime:  l.startTime
+                        minuteTime: l.minuteTime
+                        client:     l.obj.client
+                    , l.obj.socket
+                    
+                    sfFunc()
+        
+        sFunc(s) for k,s of @streams
+    
+    loadHandoffData: (translator,cb) ->
+        
+        # -- look for transferred listeners -- #
+        
+        translator.on "stream_listener", (obj,socket) =>
+            # create an output and attach it to the proper stream
+            output = new @Outputs[ obj.client.output ] @streams[ obj.stream ], socket:socket, client:obj.client
+    
+    #----------
+    
     # emulate a source connection, receiving data via sockets from our master server
                 
     class @SocketSource extends require("events").EventEmitter
-        constructor: (opts) ->
-            @master = opts.master
-            @key = opts.key
-            @log = opts.log
+        constructor: (@slave,@stream) ->
+            @log = @stream.log.child subcomponent:"socket_source"
+
+            @log.debug "created SocketSource for #{@stream.key}"
             
-            #@io = @master.of "stream:#{@key}"
+            @slave.master.on "streamdata:#{@stream.key}",    (chunk) => 
+                # our data gets converted into an octet array to go over the 
+                # socket. convert it back before insertion
+                chunk.data = new Buffer(chunk.data)
+                @emit "data", chunk
             
-            @log.debug "created SocketSource for #{@key}"
+            @slave.master.emit "stream_stats", @stream.key, (err,obj) =>
+                @emit "vitals", obj
+                
+            #@slave.master.on "disconnect", =>
+            #    @emit "disconnect"
+
+        #----------
+        
+        getRewind: (cb) ->
+            # connect to the master's StreamTransport and ask for any rewind 
+            # buffer that is available
+
+            # connect to: @master.options.host:@master.options.port
             
-            @master.on "streamdata:#{@key}",    (chunk) => @emit "data", chunk
-            @master.on "streammeta:#{@key}",    (chunk) => @emit 'metadata', chunk
+            # GET request for rewind buffer
+            @log.debug "Making Rewind Buffer request for #{@stream.key}", sock_id:@slave.master.socket.sessionid
+            req = HTTP.request 
+                hostname:   @slave.master.socket.options.host
+                port:       @slave.master.socket.options.port
+                path:       "/s/#{@stream.key}/rewind"
+                headers:   
+                    'stream-slave-id':    @slave.master.socket.sessionid
+            , (res) =>
+                @log.debug "Got Rewind response with status code of #{ res.statusCode }"
+                if res.statusCode == 200
+                    # emit a 'rewind' event with a callback to get the response 
+                    cb? null, res
+
+            req.on "error", (err) =>
+                @log.debug "Rewind request got error: #{err}", error:err
+                cb? err
+
+            req.end()
+            
+        #----------
             
         disconnect: ->
-            console.log "SocketSource disconnect for #{key} called"
+            console.log "SocketSource disconnect for #{@stream.key} called"
         

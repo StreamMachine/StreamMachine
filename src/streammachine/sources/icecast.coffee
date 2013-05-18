@@ -8,7 +8,7 @@ module.exports = class IcecastSource extends require("./base")
         
         @log = @stream.log
         
-        @emit_duration  = 0.5
+        @emitDuration  = 0.5
     
         # data is going to start streaming in as data on req. We need to pipe 
         # it into a parser to turn it into frames, headers, etc
@@ -29,7 +29,7 @@ module.exports = class IcecastSource extends require("./base")
         @parser.on "frame", (frame) =>
             @emit "frame", frame
 
-            # -- queue up frames until we get to @emit_duration -- #
+            # -- queue up frames until we get to @emitDuration -- #
             if @last_header
                 # -- recombine frame and header -- #
                 
@@ -41,7 +41,7 @@ module.exports = class IcecastSource extends require("./base")
                 if !@_chunk_queue_ts
                     @_chunk_queue_ts = (new Date)
                 
-                if @framesPerSec && ( @_chunk_queue.length / @framesPerSec > @emit_duration )
+                if @framesPerSec && ( @_chunk_queue.length / @framesPerSec > @emitDuration )
                     len = 0
                     len += b.length for b in @_chunk_queue
                 
@@ -55,33 +55,46 @@ module.exports = class IcecastSource extends require("./base")
                         
                     buf_ts = @_chunk_queue_ts
                     
+                    duration = (@_chunk_queue.length / @framesPerSec)
+                    
                     # reset chunk array
                     @_chunk_queue.length = 0
                     @_chunk_queue_ts = (new Date)
                 
                     # emit new buffer
-                    @emit "data", buf
+                    @emit "data", 
+                        data:       buf 
+                        ts:         buf_ts
+                        duration:   duration
+                        streamKey:  @streamKey
         
         # we need to grab one frame to compute framesPerSec
         @parser.on "header", (data,header) =>
-            if !@framesPerSec || !@stream_key
-                # -- compute frames per second -- #
-                # -- compute stream key -- #
+            if !@framesPerSec || !@streamKey
+                
+                # -- compute frames per second and stream key -- #
                 
                 if @stream.opts.format == 'mp3'
                     @framesPerSec = header.samplingRateHz / header.samplesPerFrame                    
-                    @stream_key = ['mp3',header.samplingRateHz,header.bitrateKBPS,(if header.modeName in ["Stereo","J-Stereo"] then "s" else "m")].join("-")
+                    @streamKey = ['mp3',header.samplingRateHz,header.bitrateKBPS,(if header.modeName in ["Stereo","J-Stereo"] then "s" else "m")].join("-")
+                
                 else if @stream.opts.format == 'aac'
                     # each AAC frame is 1024 samples
                     @framesPerSec = header.sample_freq * 1000 / 1024
-                    @stream_key = ['aac',header.sample_freq,header.profile,header.channels].join("-")
+                    @streamKey = ['aac',header.sample_freq,header.profile,header.channels].join("-")
                     
                 @log.debug "setting framesPerSec to ", frames:@framesPerSec
                 @log.debug "first header is ", header
-                    
+                
+                # -- send out our stream vitals -- #    
+
+                @_setVitals
+                    streamKey:          @streamKey
+                    framesPerSec:       @framesPerSec
+                    emitDuration:       @emitDuration
                 
             @last_header = data
-            @emit "header", data, header
+            @emit "header", data, header            
         
         @sock.on "close", =>
             @connected = false
@@ -105,7 +118,7 @@ module.exports = class IcecastSource extends require("./base")
         source:     @TYPE?() ? @TYPE
         connected:  @connected
         url:        [@sock.remoteAddress,@sock.remotePort].join(":")
-        stream_key: @stream_key
+        streamKey: @streamKey
         uuid:       @uuid
     
     #----------

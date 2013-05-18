@@ -5,6 +5,10 @@ Rewind = require "../rewind_buffer"
 
 # Streams are the endpoints that listeners connect to. 
 
+# On startup, a slave stream should connect to the master and start serving 
+# live audio as quickly as possible. It should then try to load in any 
+# Rewind buffer info available on the master. 
+
 module.exports = class Stream extends require('../rewind_buffer')        
     constructor: (@core,@key,@log,@opts) ->        
         @STATUS = "Initializing"
@@ -14,7 +18,6 @@ module.exports = class Stream extends require('../rewind_buffer')
         
         @StreamTitle  = ""
         @StreamUrl    = ""
-        
         
         # remove our max listener count
         @setMaxListeners 0
@@ -34,12 +37,19 @@ module.exports = class Stream extends require('../rewind_buffer')
         @on "source", =>
             #@source.on "data", @dataFunc
             @source.on "meta", @metaFunc
-        
+            @source.on "buffer", (c) => @_insertBuffer(c)
+            
+            @source.once "disconnect", =>
+                # try creating a new one
+                @source = null
+                @_buildSocketSource()
+                    
         # now run configure...
         process.nextTick => @configure(opts)
-                                    
-        # set up a rewind buffer
-        @rewind = new Rewind @, opts.rewind        
+
+        # -- configure a source -- #
+        
+        @_buildSocketSource()
             
     #----------
     
@@ -60,7 +70,21 @@ module.exports = class Stream extends require('../rewind_buffer')
     
     #----------
     
+    _buildSocketSource: ->
+        if !@source && @core.master
+            source = @core.socketSource @
+            @useSource source
+            
+            # -- fetch rewind? -- #
+            
+            if @_rbuffer.length == 0
+                source.getRewind (err,stream) =>
+                    @loadBuffer stream if !err
+            
+    #----------
+    
     configure: (opts) ->
+                
         # -- Preroll -- #
         
         @log.debug "Preroll settings are ", preroll:opts.preroll
@@ -171,14 +195,14 @@ module.exports = class Stream extends require('../rewind_buffer')
             seconds = (endTime.getTime() - lmeta.startTime.getTime()) / 1000
                     
             # log the connection end
-            @log.debug "Connection end", id:id, req:lmeta.obj.req, listeners:_u(@_lmeta).keys().length, bytes:lmeta.obj.req?.connection?.bytesWritten, seconds:seconds
+            @log.debug "Connection end", id:id, listeners:_u(@_lmeta).keys().length, bytes:lmeta.obj.socket?.bytesWritten, seconds:seconds
         
             @log.request "", 
-                path:       lmeta.obj.reqPath
-                ip:         lmeta.obj.reqIP
-                bytes:      lmeta.obj.req?.connection?.bytesWritten
+                path:       lmeta.obj.client.path
+                ip:         lmeta.obj.client.ip
+                ua:         lmeta.obj.client.ua
+                bytes:      lmeta.obj.socket?.bytesWritten
                 seconds:    seconds
                 time:       endTime
-                ua:         lmeta.obj.reqUA
         
             true

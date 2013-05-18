@@ -17,16 +17,16 @@ module.exports = class Preroller
         
         # -- need to look at the stream to get characteristics -- #
         
-        @stream.log.debug "waiting to call get_stream_key"
+        @stream.log.debug "waiting to call getStreamKey"
         @stream.once "source", (source) =>
-            source.get_stream_key (@stream_key) =>
-                @stream.log.debug "Stream key is #{@stream_key}"
+            source.getStreamKey (@streamKey) =>
+                @stream.log.debug "Stream key is #{@streamKey}"
         
     #----------
     
     pump: (res,cb) ->
         # short-circuit if we haven't gotten a stream key yet
-        if !@stream_key
+        if !@streamKey
             cb?()
             return true
 
@@ -36,7 +36,7 @@ module.exports = class Preroller
         
         opts = 
             host:       @options.server
-            path:       [@options.path,@key,@stream_key].join("/")
+            path:       [@options.path,@key,@streamKey].join("/")
         
         conn = res.stream?.connection || res.connection
                 

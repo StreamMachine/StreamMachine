@@ -13,9 +13,12 @@ module.exports = class SourceIn extends require("events").EventEmitter
         
         @server = net.createServer (c) => @_connection(c)
         
-        @server.listen @port
+    listen: (spec=@port) ->
+        #@core.log.debug "SourceIn listening on ", spec:spec
+        @server.listen spec
         
     _connection: (sock) => 
+        console.log "Incoming source attempt."
         # -- incoming data -- #
         
         parser = new SourceIn.IcyParser SourceIn.IcyParser.REQUEST
@@ -51,12 +54,12 @@ module.exports = class SourceIn extends require("events").EventEmitter
                 source = new (require "../sources/icecast") stream, sock, info.headers
                 stream.addSource source
             else
-                res.writeHead 401, headers
-                res.end "Invalid Source or Password."
+                sock.write "HTTP/1.0 401 Unauthorized\r\n"
+                sock.end "Invalid source or password.\r\n"
 
         else
-            res.writeHead 401, headers
-            res.end "Invalid Source or Password."
+            sock.write "HTTP/1.0 401 Unauthorized\r\n"
+            sock.end "Invalid source or password.\r\n"
             
     _tmp: ->
         if ///^/admin/metadata///.match req.url

@@ -25,7 +25,7 @@
         %td
           = if s.connected then "Yes" else "No"
         %td
-          = s.stream_key
+          = s.streamKey        
         %td
           Options...
           

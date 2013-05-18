@@ -26,15 +26,15 @@ module.exports = class Users
         constructor: (@admin) ->
             super
             
-            if @admin.core.redis?
+            if @admin.master.redis?
                 # we're using redis for users
 
                 @_user_list = (cb) =>
-                    @admin.core.redis.once_connected (redis) =>
+                    @admin.master.redis.once_connected (redis) =>
                         redis.hkeys "users", cb
 
                 @_user_lookup = (user,password,cb) =>
-                    @admin.core.redis.once_connected (redis) =>
+                    @admin.master.redis.once_connected (redis) =>
                         redis.hget "users", user, (err,val) =>
                             if err
                                 cb? err
@@ -49,7 +49,7 @@ module.exports = class Users
                                 cb? null, false
                                 
                 @_user_store = (user,password,cb) =>
-                    @admin.core.redis.once_connected (redis) =>
+                    @admin.master.redis.once_connected (redis) =>
                         console.log "in user_store for ", user, password
                         if password
                             # store the user

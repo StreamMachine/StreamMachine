@@ -19,9 +19,10 @@ module.exports = class ProxyRoom extends require("./base")
         
         @_in_disconnect = false
         
-        @emit_duration  = 0.5
+        @emitDuration  = 0.5
         
         @_chunk_queue = []
+        @_chunk_queue_ts = null
         
         @log = @stream.log
         
@@ -42,7 +43,7 @@ module.exports = class ProxyRoom extends require("./base")
         source:     @TYPE?() ? @TYPE
         connected:  @connected
         url:        @url
-        stream_key: @stream_key
+        streamKey: @streamKey
         uuid:       @uuid
     
     #----------
@@ -90,7 +91,7 @@ module.exports = class ProxyRoom extends require("./base")
         @parser.on "frame", (frame) =>
             @emit "frame", frame
 
-            # -- queue up frames until we get to @emit_duration -- #
+            # -- queue up frames until we get to @emitDuration -- #
             if @last_header
                 # -- recombine frame and header -- #
                 
@@ -99,7 +100,10 @@ module.exports = class ProxyRoom extends require("./base")
                 frame.copy(fbuf,@last_header.length)
                 @_chunk_queue.push fbuf
                 
-                if @framesPerSec && ( @_chunk_queue.length / @framesPerSec > @emit_duration )
+                if !@_chunk_queue_ts
+                    @_chunk_queue_ts = (new Date)
+                
+                if @framesPerSec && ( @_chunk_queue.length / @framesPerSec > @emitDuration )
                     len = 0
                     len += b.length for b in @_chunk_queue
                 
@@ -110,25 +114,46 @@ module.exports = class ProxyRoom extends require("./base")
                     for fb in @_chunk_queue
                         fb.copy(buf,pos)
                         pos += fb.length
+                        
+                    buf_ts = @_chunk_queue_ts
+                    
+                    duration = (@_chunk_queue.length / @framesPerSec)
                     
                     # reset chunk array
                     @_chunk_queue.length = 0
+                    @_chunk_queue_ts = (new Date)
                 
                     # emit new buffer
-                    @emit "data", buf
+                    @emit "data", 
+                        data:       buf 
+                        ts:         buf_ts
+                        duration:   duration
+                        streamKey:  @streamKey
+                    
         
         # we need to grab one frame to compute framesPerSec
         @parser.on "header", (data,header) =>
-            if !@framesPerSec || !@stream_key
-                # -- compute frames per second -- #
+            if !@framesPerSec || !@streamKey
+                # -- compute frames per second and stream key -- #
                 
-                @framesPerSec = header.samplingRateHz / header.samplesPerFrame
+                if @stream.opts.format == 'mp3'
+                    @framesPerSec = header.samplingRateHz / header.samplesPerFrame                    
+                    @streamKey = ['mp3',header.samplingRateHz,header.bitrateKBPS,(if header.modeName in ["Stereo","J-Stereo"] then "s" else "m")].join("-")
+                
+                else if @stream.opts.format == 'aac'
+                    # each AAC frame is 1024 samples
+                    @framesPerSec = header.sample_freq * 1000 / 1024
+                    @streamKey = ['aac',header.sample_freq,header.profile,header.channels].join("-")
+                    
                 @log.debug "setting framesPerSec to ", frames:@framesPerSec
                 @log.debug "first header is ", header
                 
-                # -- compute stream key -- #
-                
-                @stream_key = ['mp3',header.samplingRateHz,header.bitrateKBPS,(if header.modeName == "Stereo" then "s" else "m")].join("-")
+                # -- send out our stream vitals -- #    
+
+                @_setVitals
+                    streamKey:          @streamKey
+                    framesPerSec:       @framesPerSec
+                    emitDuration:       @emitDuration
                 
             @last_header = data
             @emit "header", data, header

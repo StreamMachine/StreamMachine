@@ -10,9 +10,7 @@ BasicStrategy   = (require "passport-http").BasicStrategy
 Users = require "./users"
 
 module.exports = class Router
-    constructor: (opts) ->
-        @core = opts?.core
-        
+    constructor: (@master) ->        
         @app = express()
         @app.set "views", __dirname + "/views"
         @app.set "view engine", "hamlc"
@@ -39,7 +37,7 @@ module.exports = class Router
         
         @app.param "stream", (req,res,next,key) =>
             # make sure it's a valid stream key
-            if key? && s = @core.streams[ key ]
+            if key? && s = @master.streams[ key ]
                 req.stream = s
                 next()
             else
@@ -64,17 +62,17 @@ module.exports = class Router
         # list streams
         @app.get "/api/streams", (req,res) =>
             # return JSON version of the status for all streams
-            api.ok req, res, @core.streamsInfo()
+            api.ok req, res, @master.streamsInfo()
 
         # list streams
         @app.get "/api/config", (req,res) =>
             # return JSON version of the status for all streams
-            api.ok req, res, @core.config()
+            api.ok req, res, @master.config()
             
         # create a stream
         @app.post "/api/streams", express.bodyParser(), (req,res) =>
             # add a new stream
-            @core.createStream req.body, (err,stream) =>
+            @master.createStream req.body, (err,stream) =>
                 if err
                     api.invalid req, res, err
                 else
@@ -84,6 +82,15 @@ module.exports = class Router
         @app.get "/api/streams/:stream", (req,res) =>
             # get detailed stream information
             api.ok req, res, req.stream.status()
+            
+        @app.get "/api/streams/:stream/dump_rewind", (req,res) =>
+            res.status(200).write ''
+            
+            req.stream.rewind.dumpBuffer res
+            
+        @app.post "/api/streams/:stream/load_rewind", (req,res) =>
+            req.stream.rewind.loadBuffer req, =>
+                res.status(200).end "OK"
         
         # update stream metadata    
         @app.post "/api/streams/:stream/metadata", (req,res) =>
@@ -109,7 +116,7 @@ module.exports = class Router
             
         # Update a stream's configuration
         @app.put "/api/streams/:stream", express.bodyParser(), (req,res) =>
-            @core.updateStream req.stream, req.body, (err,obj) =>
+            @master.updateStream req.stream, req.body, (err,obj) =>
                 if err
                     api.invalid req, res, err
                 else
@@ -118,7 +125,7 @@ module.exports = class Router
         # Delete a stream    
         @app.delete "/api/streams/:stream", (req,res) =>
             # delete a stream
-            @core.removeStream req.stream, (err,obj) =>
+            @master.removeStream req.stream, (err,obj) =>
                 if err
                     api.invalid req, res, err
                 else
@@ -158,11 +165,10 @@ module.exports = class Router
         
         # Get the web UI    
         @app.get /.*/, (req,res) =>
+            path = if @app.path() == "/" then "" else @app.path()
             res.render "layout", 
-                core:       @core
-                server:     "http://#{req.headers.host}#{@app.path()}/api"
-                streams:    JSON.stringify(@core.streamsInfo())
-                path:       @app.path()
-            
-        #@server = @app.listen @port      
-        
+                core:       @master
+                server:     "http://#{req.headers.host}#{path}/api"
+                streams:    JSON.stringify(@master.streamsInfo())
+                path:       path
+                    

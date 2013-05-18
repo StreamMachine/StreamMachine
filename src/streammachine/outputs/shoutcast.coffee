@@ -2,70 +2,100 @@ _u      = require 'underscore'
 icecast = require "icecast"
 
 module.exports = class Shoutcast
-    constructor: (@stream,@req,@res,@opts) ->
+    constructor: (@stream,@opts) ->
         @id = null
-                        
-        @reqIP      = req.connection.remoteAddress
-        @reqPath    = req.url
-        @reqUA      = _u.compact([req.param("ua"),req.headers?['user-agent']]).join(" | ")
-        @offset     = @req.param("offset") || -1
+        @socket = null
         
         @stream.log.debug "request is in Shoutcast output", stream:@stream.key
         
-        process.nextTick =>     
-            @res.chunkedEncoding = false
-            @res.useChunkedEncodingByDefault = false
-            
-
-            @ice = new icecast.Writer @stream.opts.meta_interval            
-            @ice.queue StreamTitle:@stream.StreamTitle, StreamUrl:@stream.StreamUrl
+        @client = output:"shoutcast"
+        @pump = true
         
-            headers = 
+        if @opts.req && @opts.res
+            # -- startup mode...  sending headers -- #
+            
+            @client.ip          = @opts.req.connection.remoteAddress
+            @client.path        = @opts.req.url
+            @client.ua          = _u.compact([@opts.req.param("ua"),@opts.req.headers?['user-agent']]).join(" | ")
+            @client.offset      = @opts.req.param("offset") || -1
+            @client.meta_int    = @stream.opts.meta_interval
+            
+            @opts.res.chunkedEncoding = false
+            @opts.res.useChunkedEncodingByDefault = false
+            
+            @headers = 
                 "Content-Type":         
                     if @stream.opts.format == "mp3"         then "audio/mpeg"
                     else if @stream.opts.format == "aac"    then "audio/aacp"
                     else "unknown"
                 "icy-name":             @stream.StreamTitle
                 "icy-url":              @stream.StreamUrl
-                "icy-metaint":          @stream.opts.meta_interval
+                "icy-metaint":          @client.meta_int
                         
             # write out our headers
-            res.writeHead 200, headers
-                            
-            @metaFunc = (data) =>
-                @ice.queue data if data.StreamTitle
-
-            @ice.pipe(@res)
-                
-            # -- send a preroll if we have one -- #
+            @opts.res.writeHead 200, @headers
+            @opts.res._send ''
+            
+            @socket = @opts.req.connection
+            
+            process.nextTick =>     
+                # -- send a preroll if we have one -- #
         
-            if @stream.preroll && !@req.param("preskip")
-                @stream.log.debug "making preroll request"
-                @stream.preroll.pump @res, => @connectToStream()
-            else
-                @connectToStream()       
+                if @stream.preroll && !@req.param("preskip")
+                    @stream.log.debug "making preroll request"
+                    @stream.preroll.pump @socket, => @connectToStream()
+                else
+                    @connectToStream()       
+            
+        else if @opts.socket
+            # -- socket mode... just data -- #
+            
+            @client = @opts.client
+            @socket = @opts.socket
+            @pump = false
+            process.nextTick => @connectToStream()
         
         # register our various means of disconnection
-        @req.connection.on "end",   => @disconnect()
-        @req.connection.on "close", => @disconnect()
-        @res.connection.on "close", => @disconnect()
-        
-        @res.on "error", (err) =>
-            console.log "got a response error for ", @id
-        
+        @socket.on "end",   => @disconnect()
+        @socket.on "close", => @disconnect()
         
     #----------
     
     disconnect: (force=false) ->
-        if force || @req.connection.destroyed
+        if force || @socket.destroyed
             @source?.disconnect()            
-            @res?.end() unless (@res.stream?.connection?.destroyed || @res.connection?.destroyed)
+            @socket?.end() unless (@socket?.destroyed)
+    
+    #----------
+            
+    prepForHandoff: (cb) ->
+        # we need to know where we are in relation to the icecast metaint 
+        # boundary so that we can set up our new stream and keep everything 
+        # in sync
+        
+        @client.bytesToNextMeta = @ice._parserBytesLeft
+        cb?()
     
     #----------
     
     connectToStream: ->
-        unless @req.connection.destroyed
-            @source = @stream.listen @, offset:@offset, pump:true
+        unless @socket.destroyed
+            @source = @stream.listen @, offset:@client.offset, pump:@pump
+            
+            # update our offset now that it's been checked for availability
+            @client.offset = @source.offset()
+            
+            # -- create an Icecast creator to inject metadata -- #
+            
+            @ice = new icecast.Writer @client.meta_int, initialMetaInt:@client.bytesToNextMeta||null   
+            @ice.queue StreamTitle:@stream.StreamTitle, StreamUrl:@stream.StreamUrl
+        
+            @metaFunc = (data) =>
+                @ice.queue data if data.StreamTitle
+
+            @ice.pipe(@socket)
+            
+            # -- pipe source audio to icecast -- #
             
             @source.pipe @ice
             @source.on "meta", @metaFunc

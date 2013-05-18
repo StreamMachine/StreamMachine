@@ -166,7 +166,7 @@ module.exports = class LogController
             @_opening = true
                         
             initFile = true
-            if path.existsSync(@options.filename)
+            if fs.existsSync(@options.filename)
                 # file exists...  see if there's anything in it
                 stats = fs.statSync(@options.filename)
                 

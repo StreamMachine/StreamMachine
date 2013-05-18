@@ -1,7 +1,7 @@
 _u = require "underscore"
 uuid = require "node-uuid"
 
-#Rewind = require('../rewind_buffer')
+Rewind = require('../rewind_buffer')
 Proxy = require('../sources/proxy_room')
 
 # Master streams are about source management. 
@@ -30,14 +30,31 @@ module.exports = class Stream extends require('events').EventEmitter
         @sources = []
         @source = null
         
-        @emit_duration = 0
+        # Cache the last stream vitals we've seen
+        @_vitals = null
+        
+        @emitDuration = 0
         
         @STATUS = "Initializing"
         
         @log.event "Stream is initializing."
         
-        # set up a rewind buffer
-        #@rewind = new Rewind @, @opts.rewind
+        # -- Initialize Master Rewinder -- #
+        
+        # set up a rewind buffer, for use in bringing new slaves up to speed 
+        # or to transfer to a new master when restarting
+        @log.info "Initializing RewindBuffer for master stream."
+        @rewind = new Rewind
+        @rewind.opts = @opts
+        @rewind.log = @log.child module:"rewind"
+        
+        # Rewind listens to us, not to our source
+        @rewind.emit "source", @
+        
+        # Pass along buffer loads
+        @rewind.on "buffer", (c) => @emit "buffer", c
+        
+        # -- Set up data functions -- #
         
         @_nextMeta = null
         
@@ -46,11 +63,13 @@ module.exports = class Stream extends require('events').EventEmitter
             @emit "meta", meta
         
         @dataFunc = (data) => 
-            @emit "data", data:data, meta:@_nextMeta
-            #@_nextMeta = null
-        
-        @headFunc = (head) => @emit "header", head
-        
+            # inject our metadata into the data object
+            @emit "data", _u.extend {}, data, meta:@_nextMeta
+            
+        @vitalsFunc = (vitals) =>
+            @_vitals = vitals
+            @emit "vitals", vitals
+                
         # -- Hardcoded Source -- #
         
         # This is an initial source like a proxy that should be connected from 
@@ -90,6 +109,20 @@ module.exports = class Stream extends require('events').EventEmitter
     
     config: ->
         @opts
+        
+    #----------
+        
+    vitals: (cb) ->
+        _vFunc = (v) =>
+            console.log "Emit vital info", v
+            cb? null, v
+                        
+        if @_vitals
+            console.log "Sending vitals now."
+            _vFunc @_vitals
+        else
+            console.log "Waiting for headers to send vitals"
+            @once "vitals", _vFunc
     
     #----------
     
@@ -98,6 +131,7 @@ module.exports = class Stream extends require('events').EventEmitter
             id:         @key
             sources:    ( s.info() for s in @sources )
             listeners:  @listeners()
+            rewind:     @rewind.bufferedSecs()
         , @opts 
     
     #----------
@@ -165,22 +199,22 @@ module.exports = class Stream extends require('events').EventEmitter
         , 5000
         
         # Look for a header before switching
-        newsource.once "header", =>
+        newsource.vitals (vitals) =>
             if old_source
                 # unhook from the old source's events
                 old_source.removeListener "metadata",   @metaFunc
                 old_source.removeListener "data",       @dataFunc
-                old_source.removeListener "header",     @headFunc
+                old_source.removeListener "vitals",     @vitalsFunc
                     
             @source = newsource
                     
             # connect to the new source's events
             newsource.on "metadata",   @metaFunc
             newsource.on "data",       @dataFunc
-            newsource.on "header",     @headFunc
+            newsource.on "vitals",     @vitalsFunc
             
             # how often will we be emitting?
-            @emit_duration = @source.emit_duration
+            @emitDuration = vitals.emitDuration
                 
             # note that we've got a new source
             process.nextTick =>
@@ -189,6 +223,7 @@ module.exports = class Stream extends require('events').EventEmitter
                     old_source: (old_source?.TYPE?() ? old_source?.TYPE)
                     
                 @emit "source", newsource
+                @vitalsFunc vitals
 
             # jump our new source to the front of the list (and remove it from
             # anywhere else in the list)

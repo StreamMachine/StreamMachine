@@ -6,7 +6,8 @@ module.exports = class Source extends require("events").EventEmitter
     
     constructor: ->
         @uuid = null
-        @stream_key = null
+        @streamKey = null
+        @_vitals = null
             
     #----------
     
@@ -20,8 +21,21 @@ module.exports = class Source extends require("events").EventEmitter
     
     #----------
         
-    get_stream_key: (cb) ->
-        if @stream_key
-            cb? @stream_key
+    getStreamKey: (cb) ->
+        if @streamKey
+            cb? @streamKey
         else
-            @once "header", => cb? @stream_key
+            @once "vitals", => cb? @_vitals.streamKey
+            
+    #----------
+    
+    _setVitals: (vitals) ->
+        @_vitals = vitals
+        @emit "vitals", @_vitals
+        
+    vitals: (cb) ->
+        if @_vitals
+            cb? @_vitals
+        else
+            @once "vitals", => cb? @_vitals
+        

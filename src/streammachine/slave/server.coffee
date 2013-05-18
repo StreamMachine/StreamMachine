@@ -109,10 +109,10 @@ module.exports = class Server extends require('events').EventEmitter
                 # normal live stream (with or without shoutcast)
                 if req.headers['icy-metadata']
                     # -- shoutcast listener -- #
-                    new @core.Outputs.shoutcast req.stream, req, res
+                    new @core.Outputs.shoutcast req.stream, req:req, res:res
                 else
                     # -- straight mp3 listener -- #
-                    new @core.Outputs.mp3 req.stream, req, res
+                    new @core.Outputs.raw req.stream, req:req, res:res
     
     #----------
     

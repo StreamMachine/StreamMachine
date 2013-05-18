@@ -57,7 +57,7 @@ module.exports = class Sockets
                     
                 # set stream timecheck
                 setInterval( =>
-                    sock.emit "timecheck"
+                    sock.emit "timecheck",
                         time:       new Date
                         buffered:   v.rewind.bufferedSecs()
                 , 5000)
