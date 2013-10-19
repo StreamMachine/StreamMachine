@@ -64,6 +64,10 @@ module.exports = class LogController
         if config.campfire?
             # set up logging to a Campfire room
             transports.push new LogController.CampfireLogger config.campfire
+
+        if config.pagerduty?
+            # alerts to PagerDuty
+            transports.push new LogController.PagerDutyLogger config.pagerduty
         
         # -- Remote -- #
         
@@ -253,6 +257,49 @@ module.exports = class LogController
     
     #----------
     
+    class @PagerDutyLogger extends winston.Transport
+        name: "pagerduty"
+
+        constructor: (@opts) ->
+            super @opts
+
+            PagerDuty = (require "pagerduty")
+
+            @pager = new PagerDuty
+                serviceKey: @opts.serviceKey
+
+        log: (level,msg,meta,cb) ->
+            details =
+                level: level
+                msg: msg
+            pager = @pager
+
+            pager.create
+                description: "StreamMachine Alert"
+                details: details
+
+                callback: (err, response) ->
+                    throw err if err
+                    # When the alert is acknowledged
+                    pager.acknowledge
+                        incidentKey: response.incident_key,
+                        description: "StreamMachine Alert was Acknowledged."
+                        details: details
+
+                        callback: (err, response) ->
+                            throw err if err
+                            # When the alert is resolved
+                            pager.resolve
+                                incidentKey: response.incident_key,
+                                description: "StreamMachine Alert was Resolved."
+                                details: details
+
+                                callback: (err, response) ->
+                                    # Fallback
+                                    throw err if err
+
+    #----------
+
     class @SocketLogger extends winston.Transport
         name: "socket"
         

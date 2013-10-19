@@ -19,6 +19,10 @@
             "account":  "streammachine",
             "token":    "INSERT_CAMPFIRE_TOKEN",
             "room":     "123_ROOM_NUMBER"
+        },
+        "pagerduty": {
+            "level" : "alert",
+            "serviceKey" : "STREAM_MACHINE_SERVICE_KEY"
         }
     },
     "alerts": {
