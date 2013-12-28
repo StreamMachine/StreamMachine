@@ -32,6 +32,9 @@
                 "from":             "StreamMachine <streammachine@my.domain>",
                 "to":               "stream_admin@my.domain"
             }
+        },
+        "pagerduty": {
+            "serviceKey" : "STREAM_MACHINE_SERVICE_KEY"
         }
     },
 	"redis": {

@@ -1,6 +1,8 @@
 nconf       = require "nconf"
 _u          = require "underscore"
 nodemailer  = require "nodemailer"
+pagerduty   = require "pagerduty"
+
 
 ALERT_TYPES = 
     sourceless:
@@ -20,6 +22,7 @@ module.exports = class Alerts extends require("events").EventEmitter
         @logger = @opts.logger
         
         @email = new Alerts.Email @, nconf.get("alerts:email") if nconf.get("alerts:email")
+        @pagerduty = new Alerts.PagerDuty @, nconf.get("alerts:pagerduty") if nconf.get("alerts:pagerduty")
 
         @_states = {}
         
@@ -173,3 +176,80 @@ module.exports = class Alerts extends require("events").EventEmitter
                 @alerts.logger.debug "All clear email sent to #{email.to}.", code:msg.code, key:msg.key
             
         #----------
+
+
+
+    class @PagerDuty
+        constructor: (@alerts, @opts) ->
+            @pager = new pagerduty(serviceKey: @opts.serviceKey)
+            @incidentKeys = {}
+
+            @alerts.on "alert", (msg) => @_sendAlert(msg)
+            @alerts.on "alert_cleared", (msg) => @_sendAllClear(msg)
+
+
+        # Create the initial alert in PagerDuty.
+        # In the callback, if the response contained an incident key,
+        # then we'll hold on to that so we can later resolve the alert
+        # using the same key.
+        _sendAlert: (msg) ->
+            details = @_details(msg)
+
+            @pager.create
+                description : "[StreamMachine/#{msg.key}] #{msg.code} Alert"
+                details     : details
+
+                callback: (error, response) =>
+                    if response.incident_key
+                        @incidentKeys[details.key] = response.incident_key
+
+                    @_logResponse(error, response,
+                        "Alert sent to PagerDuty.", msg)
+
+
+        # Mark the alert as "Resolved" in PagerDuty
+        # In the callback, whether it was an error or success, we will
+        # delete the incident key from the stored keys.
+        _sendAllClear: (msg) ->
+            details = @_details(msg)
+
+            @pager.resolve
+                incidentKey : @incidentKeys[details.key],
+                description : "[StreamMachine/#{msg.key}] #{msg.code} Cleared"
+                details     : details
+
+                callback: (error, response) =>
+                    delete @incidentKeys[details.key]
+
+                    @_logResponse(error, response,
+                        "Alert marked as Resolved in PagerDuty.", msg)
+
+
+        # Details to send to PagerDuty. The properties are arbitrary
+        # * via  - Just so we know.
+        # * code - The alert code ("sourceless", "disconnected").
+        # * msg  - The alert description.
+        # * key  - A key to identify this alert. This is to help us find the
+        #          correct incidentKey when resolving an alert. It's possible
+        #          (but unlikely) that two alerts with the same key could
+        #          exist at the same time, which would result in the first
+        #          alert never being marked as "resolved" in PagerDuty.
+        _details: (msg) ->
+            via             : "StreamMachine Alerts"
+            code            : msg.code
+            description     : msg.description
+            key             : "#{msg.code}/#{msg.key}"
+
+
+        # Log the PagerDuty response, whether it was a success or an error.
+        _logResponse: (error, response, logText, msg) ->
+            if error
+                @alerts.logger.error(
+                    "Error sending alert to PagerDuty: #{error}",
+                    error: error)
+
+            else
+                @alerts.logger.debug(
+                    logText,
+                    code    : msg.code,
+                    key     : msg.key)

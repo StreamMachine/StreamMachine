@@ -36,6 +36,7 @@
         "concentrate":          "~0.2.2",
         "dissolve":             "~0.3.1",
         "campfire":             "~0.1.1",
+        "pagerduty":            "~0.0.3",
         "temp":                 "~0.5.0"
     },
     "bin": {
