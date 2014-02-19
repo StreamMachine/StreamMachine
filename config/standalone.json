@@ -13,6 +13,15 @@
       "metaTitle":        "Testing",
       "host":             "localhost",
       "source_password":  "testing"
+    },
+    "aac": {
+      "key":              "aac",
+      "root_route":       false,
+      "format":           "aac",
+      "seconds":          3600,
+      "metaTitle":        "Testing",
+      "host":             "localhost",
+      "source_password":  "testing"
     }
   },
   "users": {
