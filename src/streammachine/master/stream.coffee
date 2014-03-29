@@ -235,32 +235,47 @@ module.exports = class Stream extends require('events').EventEmitter
         
         # Look for a header before switching
         newsource.vitals (vitals) =>
-            if old_source
-                # unhook from the old source's events
-                @_disconnectSource(old_source)
-                    
-            @source = newsource
-                    
-            # connect to the new source's events
-            newsource.on "metadata",   @sourceMetaFunc
-            newsource.on "data",       @dataFunc
-            newsource.on "vitals",     @vitalsFunc
-            
-            # how often will we be emitting?
-            @emitDuration = vitals.emitDuration
-                
-            # note that we've got a new source
-            process.nextTick =>
-                @log.event "New source is active.", 
-                    new_source: (newsource.TYPE?() ? newsource.TYPE)
-                    old_source: (old_source?.TYPE?() ? old_source?.TYPE)
-                    
-                @emit "source", newsource
-                @vitalsFunc vitals
+            # While we were waiting for vitals, another source may have been
+            # made active. This might occur if two sources are connected
+            # at the same time (or very quickly). This causes two sources to
+            # be  "active" and you get a looping stream.
+            # To prevent this, we'll make sure that the source wasn't changed
+            # while we were waiting. Since @source is cached in old_source
+            # above, we can use that to see if @source has been changed.
+            if @source && @source != old_source
+                @log.debug "Another source took over while waiting for vitals. New source won't be used.",
+                    new_source: (newsource.TYPE?() ? newsource.TYPE),
+                    active_source: (@source.TYPE?() ? @source.TYPE)
 
-            # jump our new source to the front of the list (and remove it from
-            # anywhere else in the list)
-            @sources = _u.flatten [newsource,_u(@sources).without newsource]
+                @sources.push(newsource)
+
+            else
+                if old_source
+                    # unhook from the old source's events
+                    @_disconnectSource(old_source)
+                        
+                @source = newsource
+                        
+                # connect to the new source's events
+                newsource.on "metadata",   @sourceMetaFunc
+                newsource.on "data",       @dataFunc
+                newsource.on "vitals",     @vitalsFunc
+                
+                # how often will we be emitting?
+                @emitDuration = vitals.emitDuration
+                    
+                # note that we've got a new source
+                process.nextTick =>
+                    @log.event "New source is active.", 
+                        new_source: (newsource.TYPE?() ? newsource.TYPE)
+                        old_source: (old_source?.TYPE?() ? old_source?.TYPE)
+                        
+                    @emit "source", newsource
+                    @vitalsFunc vitals
+
+                # jump our new source to the front of the list (and remove it from
+                # anywhere else in the list)
+                @sources = _u.flatten [newsource,_u(@sources).without newsource]
             
             # cancel our timeout
             clearTimeout alarm
