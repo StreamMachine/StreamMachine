@@ -210,11 +210,6 @@ module.exports = class LogController
         #----------
         
         open: (cb) ->
-            # If the directory for the w3c file doesn't exist, don't try to
-            # open it.
-            if !f.existsSync(path.dirname(@options.filename))
-                return false
-
             if @_opening
                 console.log "W3C already opening... wait."
                 # we're already trying to open.  return an error so we queue the message
@@ -241,7 +236,7 @@ module.exports = class LogController
                     @_opening = null
                     cb?()
                 
-                if not fs.statSync(@options.filename).size > 0
+                if fs.statSync(@options.filename).size == 0
                     # write our initial w3c lines before we return
                     @_file.write "#Software: StreamMachine\n#Version: 0.2.9\n#Fields: c-ip date time cs-uri-stem c-status cs(User-Agent) sc-bytes x-duration\n", "utf8", =>
                         _clear()
