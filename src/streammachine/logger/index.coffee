@@ -225,18 +225,7 @@ module.exports = class LogController
                 @open(cb)
             , 1000
             
-            # is this a new file or one that we're just re-opening?
-            initFile = true
-            if fs.existsSync(@options.filename)
-                # file exists...  see if there's anything in it
-                stats = fs.statSync(@options.filename)
-                
-                if stats.size > 0
-                    # existing file...  don't write headers, just open so we can 
-                    # start appending
-                    initFile = false
-            
-            @_file = fs.createWriteStream @options.filename, flags:(if initFile then "w" else "r+")
+            @_file = fs.createWriteStream @options.filename, flags:'a'
             
             @_file.once "open", (err) =>
                 console.log "w3c log open with ", err
@@ -247,7 +236,7 @@ module.exports = class LogController
                     @_opening = null
                     cb?()
                 
-                if initFile
+                if fs.statSync(@options.filename).size == 0
                     # write our initial w3c lines before we return
                     @_file.write "#Software: StreamMachine\n#Version: 0.2.9\n#Fields: c-ip date time cs-uri-stem c-status cs(User-Agent) sc-bytes x-duration\n", "utf8", =>
                         _clear()
