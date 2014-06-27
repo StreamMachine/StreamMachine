@@ -82,12 +82,18 @@ describe "Master Stream", ->
         source1 = null
         source2 = null
         source3 = null
+        uuids   = {}
 
         beforeEach (done) ->
             stream = new MasterStream null, "test1", logger, STREAM1
             source1 = new FileSource stream, mp3a
             source2 = new FileSource stream, mp3b
             source3 = new FileSource stream, mp3c
+
+            uuids[source1.uuid] = "source1"
+            uuids[source2.uuid] = "source2"
+            uuids[source3.uuid] = "source3"
+
             done()
 
         afterEach (done) ->
@@ -96,6 +102,8 @@ describe "Master Stream", ->
             source2.removeAllListeners()
             source3.removeAllListeners()
             done()
+
+        #----------
 
         it "doesn't get confused by simultaneous addSource calls", (done) ->
             this.timeout 6000
@@ -106,22 +114,25 @@ describe "Master Stream", ->
                 emits = []
 
                 af = _.after 5, ->
-                    uuid = stream.source.uuid
+                    # expect all data emits to be from the same source
+                    expect(_(emits).uniq()).to.have.length 1
 
-                    expect(emits[0].uuid).to.equal uuid
-                    expect(emits[1].uuid).to.equal uuid
-                    expect(emits[2].uuid).to.equal uuid
-                    expect(emits[3].uuid).to.equal uuid
-                    expect(emits[4].uuid).to.equal uuid
+                    # expect that they came from source1
+                    expect(emits[0]).to.equal "source1"
+
+                    # expect that the stream lists source1 as its source
+                    expect(stream.source).to.equal source1
 
                     done()
 
                 stream.on "data", (data) ->
-                    emits.push data
+                    emits.push uuids[data.uuid]
                     af()
 
             stream.addSource source1
             stream.addSource source2
+
+        #----------
 
         it "doesn't get confused by quick promoteSource calls", (done) ->
             this.timeout 6000
@@ -134,21 +145,66 @@ describe "Master Stream", ->
                         emits = []
 
                         af = _.after 5, ->
-                            uuid = stream.source.uuid
+                            # expect all data emits to be from the same source
+                            expect(_(emits).uniq()).to.have.length 1
 
-                            expect(emits[0].uuid).to.equal uuid
-                            expect(emits[1].uuid).to.equal uuid
-                            expect(emits[2].uuid).to.equal uuid
-                            expect(emits[3].uuid).to.equal uuid
-                            expect(emits[4].uuid).to.equal uuid
+                            # expect that source to be the same one listed
+                            expect(emits[0]).to.equal stream.source.uuid
 
                             done()
 
                         stream.on "data", (data) ->
-                            emits.push data
+                            emits.push data.uuid
                             af()
 
                         stream.promoteSource source2.uuid
                         stream.promoteSource source3.uuid
 
+        #----------
 
+        it "falls back if a source disconnects during promotion", (done) ->
+            this.timeout 5000
+
+            stream.addSource source1, ->
+                stream.addSource source2, ->
+                    source2.once "connect", ->
+                        stream.promoteSource source2.uuid
+                        source2.disconnect()
+
+                        # listen for five data emits.  they should all come from
+                        # the same source uuid
+                        emits = []
+
+                        af = _.after 5, ->
+                            expect(_(emits).uniq()).to.length 1
+                            expect(emits[0]).to.equal "source1"
+                            done()
+
+                        stream.on "data", (data) ->
+                            emits.push uuids[data.uuid]
+                            af()
+
+        #----------
+
+        it "handles a source disconnecting as a source is promoted", (done) ->
+            this.timeout 5000
+
+            source1.once "connect", ->
+                stream.addSource source1, ->
+                    stream.addSource source2, ->
+                        stream.addSource source3, ->
+                            # ask for source3 to be promoted
+                            stream.promoteSource source3.uuid
+
+                            # but simultaneously let source1 disconnect
+                            source1.disconnect()
+
+                            emits = []
+                            af = _.after 5, ->
+                                expect(_(emits).uniq()).to.length 1
+                                expect(emits[0]).to.equal "source3"
+                                done()
+
+                            stream.on "data", (data) ->
+                                emits.push uuids[data.uuid]
+                                af()
