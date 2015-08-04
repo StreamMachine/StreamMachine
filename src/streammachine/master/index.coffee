@@ -1,7 +1,7 @@
-_       = require "underscore"
-temp    = require "temp"
-net     = require "net"
-fs      = require "fs"
+_           = require "underscore"
+temp        = require "temp"
+net         = require "net"
+fs          = require "fs"
 express     = require "express"
 Throttle    = require "throttle"
 
@@ -14,6 +14,7 @@ Alerts      = require "../alerts"
 Analytics   = require "./analytics"
 Monitoring  = require "./monitoring"
 SlaveIO     = require "./master_io"
+Prometheus  = require "./prometheus"
 
 RewindDumpRestore   = require "../rewind/dump_restore"
 
@@ -104,6 +105,11 @@ module.exports = class Master extends require("events").EventEmitter
         # -- Set up our monitoring module -- #
 
         @monitoring = new Monitoring @, @log.child(module:"monitoring")
+
+        # -- Prometheus metrics -- #
+
+        if @options.prometheus
+            @prometheus = new Prometheus @
 
     #----------
 

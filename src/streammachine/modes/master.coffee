@@ -32,6 +32,8 @@ module.exports = class MasterMode extends require("./base")
         @server.use "/s",   @master.transport.app
         @server.use "/api", @master.api.app
 
+        @server.use "/metrics", @master.prometheus.app if @master.prometheus
+
         if process.send?
             @_rpc = new RPC process, functions:
                 OK: (msg,handle,cb) ->

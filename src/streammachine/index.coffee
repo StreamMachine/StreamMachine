@@ -27,6 +27,7 @@ module.exports = class StreamMachine
 
         behind_proxy:   false
 
+        prometheus: true
+
         admin:
             require_auth: false
-
