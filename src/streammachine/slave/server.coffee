@@ -7,6 +7,7 @@ uuid    = require 'node-uuid'
 http    = require "http"
 compression = require "compression"
 cors    = require "cors"
+maxmind = require "maxmind"
 
 module.exports = class Server extends require('events').EventEmitter
     constructor: (@opts) ->
@@ -29,6 +30,12 @@ module.exports = class Server extends require('events').EventEmitter
         @app.useChunkedEncodingByDefault = false
 
         @app.set "x-powered-by", "StreamMachine"
+
+        # -- are we behind a geolock? -- #
+
+        if @config.geolock && @config.geolock.enabled
+            @logger.info "Enabling 'geolock' for streams"
+            maxmind.init "./config/GeoIP.dat"
 
         # -- are we behind a proxy? -- #
 
@@ -57,8 +64,11 @@ module.exports = class Server extends require('events').EventEmitter
         @app.param "stream", (req,res,next,key) =>
             # make sure it's a valid stream key
             if key? && s = @core.streams[ key ]
-                req.stream = s
-                next()
+                if @isGeolocked req, s, s.opts
+                    res.status(403).end "Forbidden.\n"
+                else
+                    req.stream = s
+                    next()
             else
                 res.status(404).end "Invalid stream.\n"
 
@@ -195,6 +205,22 @@ module.exports = class Server extends require('events').EventEmitter
                 else
                     # -- straight mp3 listener -- #
                     new @core.Outputs.raw req.stream, req:req, res:res
+
+    #----------
+
+    isGeolocked: (req,stream,opts) ->
+        if opts.geolock && opts.geolock.enabled
+            country = maxmind.getCountry req.ip;
+
+            if country && country.code != "--"
+                index = opts.geolock.indexOf(country.code)
+
+                if opts.geolock.mode == "blacklist"
+                    return index >= 0
+
+                else
+                    return index < 0
+        false
 
     #----------
 

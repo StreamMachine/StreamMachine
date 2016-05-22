@@ -1,4 +1,4 @@
-var Server, compression, cors, express, fs, http, path, util, uuid, _,
+var Server, compression, cors, express, fs, http, maxmind, path, util, uuid, _,
   __hasProp = {}.hasOwnProperty,
   __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
 
@@ -19,6 +19,8 @@ http = require("http");
 compression = require("compression");
 
 cors = require("cors");
+
+maxmind = require("maxmind");
 
 module.exports = Server = (function(_super) {
   __extends(Server, _super);
@@ -41,6 +43,10 @@ module.exports = Server = (function(_super) {
     this.app.httpAllowHalfOpen = true;
     this.app.useChunkedEncodingByDefault = false;
     this.app.set("x-powered-by", "StreamMachine");
+    if (this.config.geolock && this.config.geolock.enabled) {
+      this.logger.info("Enabling 'geolock' for streams");
+      maxmind.init("./config/GeoIP.dat");
+    }
     if (this.config.behind_proxy) {
       this.logger.info("Enabling 'trust proxy' for Express.js");
       this.app.set("trust proxy", true);
@@ -65,8 +71,12 @@ module.exports = Server = (function(_super) {
       return function(req, res, next, key) {
         var s;
         if ((key != null) && (s = _this.core.streams[key])) {
-          req.stream = s;
-          return next();
+          if (_this.isGeolocked(req, s, s.opts)) {
+            return res.status(403).end("Forbidden.\n");
+          } else {
+            req.stream = s;
+            return next();
+          }
         } else {
           return res.status(404).end("Invalid stream.\n");
         }
@@ -225,6 +235,22 @@ module.exports = Server = (function(_super) {
       };
     })(this));
   }
+
+  Server.prototype.isGeolocked = function(req, stream, opts) {
+    var country, index;
+    if (opts.geolock && opts.geolock.enabled) {
+      country = maxmind.getCountry(req.ip);
+      if (country && country.code !== "--") {
+        index = opts.geolock.indexOf(country.code);
+        if (opts.geolock.mode === "blacklist") {
+          return index >= 0;
+        } else {
+          return index < 0;
+        }
+      }
+    }
+    return false;
+  };
 
   Server.prototype.listen = function(port, cb) {
     this.logger.info("SlaveWorker called listen");
