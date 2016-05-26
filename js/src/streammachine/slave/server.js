@@ -46,7 +46,7 @@ module.exports = Server = (function(_super) {
     this.isGeolockEnabled = this.config.geolock && this.config.geolock.enabled;
     if (this.isGeolockEnabled) {
       this.logger.info("Enabling 'geolock' for streams");
-      this.countryLookup = maxmind.open("./config/GeoLite2-Country.mmdb");
+      this.countryLookup = maxmind.open(this.config.geolock.config_file);
     }
     if (this.config.behind_proxy) {
       this.logger.info("Enabling 'trust proxy' for Express.js");

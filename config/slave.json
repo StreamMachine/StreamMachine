@@ -11,6 +11,7 @@
   },
  "behind_proxy": true,
   "geolock": {
-    "enabled": true
+    "enabled": true,
+    "config_file": "./config/GeoLite2-Country.mmdb"
   }
 }

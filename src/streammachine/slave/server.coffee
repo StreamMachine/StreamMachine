@@ -36,7 +36,7 @@ module.exports = class Server extends require('events').EventEmitter
         @isGeolockEnabled = (@config.geolock && @config.geolock.enabled)
         if @isGeolockEnabled
             @logger.info "Enabling 'geolock' for streams"
-            @countryLookup = maxmind.open "./config/GeoLite2-Country.mmdb"
+            @countryLookup = maxmind.open @config.geolock.config_file
 
         # -- are we behind a proxy? -- #
 
