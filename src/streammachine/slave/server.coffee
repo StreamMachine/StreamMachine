@@ -36,7 +36,7 @@ module.exports = class Server extends require('events').EventEmitter
         @isGeolockEnabled = (@config.geolock && @config.geolock.enabled)
         if @isGeolockEnabled
             @logger.info "Enabling 'geolock' for streams"
-            maxmind.init "./config/GeoIP.dat"
+            @countryLookup = maxmind.open "./config/GeoLite2-Country.mmdb"
 
         # -- are we behind a proxy? -- #
 
@@ -213,10 +213,14 @@ module.exports = class Server extends require('events').EventEmitter
         locked = false
 
         if opts.geolock && opts.geolock.enabled
-            country = maxmind.getCountry req.ip
+            data = @countryLookup.get req.ip
+            country = null
 
-            if country && country.code != "--"
-                index = opts.geolock.countryCodes.indexOf(country.code)
+            if data && data.country
+                country = data.country
+
+            if country && country.iso_code
+                index = opts.geolock.countryCodes.indexOf(country.iso_code)
 
                 if opts.geolock.mode == "blacklist"
                     locked = index >= 0
@@ -226,7 +230,7 @@ module.exports = class Server extends require('events').EventEmitter
 
             if locked && country
                 # request from invalid country...
-                @logger.debug "Request from invalid country: #{country.name} (#{country.code})",
+                @logger.debug "Request from invalid country: #{country.names.es} (#{country.iso_code})",
                     ip: req.ip
 
         locked
