@@ -33,7 +33,8 @@ module.exports = class Server extends require('events').EventEmitter
 
         # -- are we behind a geolock? -- #
 
-        if @config.geolock && @config.geolock.enabled
+        @isGeolockEnabled = (@config.geolock && @config.geolock.enabled)
+        if @isGeolockEnabled
             @logger.info "Enabling 'geolock' for streams"
             maxmind.init "./config/GeoIP.dat"
 
@@ -64,8 +65,8 @@ module.exports = class Server extends require('events').EventEmitter
         @app.param "stream", (req,res,next,key) =>
             # make sure it's a valid stream key
             if key? && s = @core.streams[ key ]
-                if @isGeolocked req, s, s.opts
-                    res.status(403).end "Forbidden.\n"
+                if @isGeolockEnabled && @isGeolocked req, s, s.opts
+                    res.status(403).end("Invalid Country.")
                 else
                     req.stream = s
                     next()
@@ -209,18 +210,26 @@ module.exports = class Server extends require('events').EventEmitter
     #----------
 
     isGeolocked: (req,stream,opts) ->
+        locked = false
+
         if opts.geolock && opts.geolock.enabled
-            country = maxmind.getCountry req.ip;
+            country = maxmind.getCountry req.ip
 
             if country && country.code != "--"
-                index = opts.geolock.indexOf(country.code)
+                index = opts.geolock.countryCodes.indexOf(country.code)
 
                 if opts.geolock.mode == "blacklist"
-                    return index >= 0
+                    locked = index >= 0
 
                 else
-                    return index < 0
-        false
+                    locked = index < 0
+
+            if locked && country
+                # request from invalid country...
+                @logger.debug "Request from invalid country: #{country.name} (#{country.code})",
+                    ip: req.ip
+
+        locked
 
     #----------
 

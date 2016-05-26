@@ -9,6 +9,7 @@
     "stdout": true,
     "level": "debug"
   },
+ "behind_proxy": true,
   "geolock": {
     "enabled": true
   }

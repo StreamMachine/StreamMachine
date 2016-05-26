@@ -43,7 +43,8 @@ module.exports = Server = (function(_super) {
     this.app.httpAllowHalfOpen = true;
     this.app.useChunkedEncodingByDefault = false;
     this.app.set("x-powered-by", "StreamMachine");
-    if (this.config.geolock && this.config.geolock.enabled) {
+    this.isGeolockEnabled = this.config.geolock && this.config.geolock.enabled;
+    if (this.isGeolockEnabled) {
       this.logger.info("Enabling 'geolock' for streams");
       maxmind.init("./config/GeoIP.dat");
     }
@@ -71,8 +72,8 @@ module.exports = Server = (function(_super) {
       return function(req, res, next, key) {
         var s;
         if ((key != null) && (s = _this.core.streams[key])) {
-          if (_this.isGeolocked(req, s, s.opts)) {
-            return res.status(403).end("Forbidden.\n");
+          if (_this.isGeolockEnabled && _this.isGeolocked(req, s, s.opts)) {
+            return res.status(403).end("Invalid Country.");
           } else {
             req.stream = s;
             return next();
@@ -237,19 +238,25 @@ module.exports = Server = (function(_super) {
   }
 
   Server.prototype.isGeolocked = function(req, stream, opts) {
-    var country, index;
+    var country, index, locked;
+    locked = false;
     if (opts.geolock && opts.geolock.enabled) {
       country = maxmind.getCountry(req.ip);
       if (country && country.code !== "--") {
-        index = opts.geolock.indexOf(country.code);
+        index = opts.geolock.countryCodes.indexOf(country.code);
         if (opts.geolock.mode === "blacklist") {
-          return index >= 0;
+          locked = index >= 0;
         } else {
-          return index < 0;
+          locked = index < 0;
         }
       }
+      if (locked && country) {
+        this.logger.debug("Request from invalid country: " + country.name + " (" + country.code + ")", {
+          ip: req.ip
+        });
+      }
     }
-    return false;
+    return locked;
   };
 
   Server.prototype.listen = function(port, cb) {
