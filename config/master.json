@@ -17,7 +17,7 @@
      "seconds": 3600,
      "metaTitle": "Testing",
      "host": "localhost",
-     "fallback": "http://vivo.radioconvos.com/stream",
+     "fallback": "http://radio.com/stream",
      "source_password": "testing",
      "geolock": {
         "enabled": true,
