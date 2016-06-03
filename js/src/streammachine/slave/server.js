@@ -73,7 +73,11 @@ module.exports = Server = (function(_super) {
         var s;
         if ((key != null) && (s = _this.core.streams[key])) {
           if (_this.isGeolockEnabled && _this.isGeolocked(req, s, s.opts)) {
-            return res.status(403).end("Invalid Country.");
+            if (s.opts.geolock.fallback) {
+              return res.redirect(302, s.opts.geolock.fallback);
+            } else {
+              return res.status(403).end("Invalid Country.");
+            }
           } else {
             req.stream = s;
             return next();

@@ -21,12 +21,26 @@
      "source_password": "testing",
      "geolock": {
         "enabled": true,
+        "fallback": "http://localhost:8021/test2",
         "mode": "whitelist",
         "countryCodes": [
           "BE",
           "FR",
           "GB"
         ]
+      }
+   },
+   "test2": {
+     "key": "test",
+     "root_route": true,
+     "format": "mp3",
+     "seconds": 3600,
+     "metaTitle": "Testing",
+     "host": "localhost",
+     "fallback": "http://radio.com/stream",
+     "source_password": "testing",
+     "geolock": {
+        "enabled": false
       }
    }
  }

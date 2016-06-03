@@ -66,7 +66,10 @@ module.exports = class Server extends require('events').EventEmitter
             # make sure it's a valid stream key
             if key? && s = @core.streams[ key ]
                 if @isGeolockEnabled && @isGeolocked req, s, s.opts
-                    res.status(403).end("Invalid Country.")
+                    if s.opts.geolock.fallback
+                        res.redirect(302, s.opts.geolock.fallback)
+                    else
+                        res.status(403).end("Invalid Country.")
                 else
                     req.stream = s
                     next()
