@@ -7,6 +7,7 @@ uuid    = require 'node-uuid'
 http    = require "http"
 compression = require "compression"
 cors    = require "cors"
+maxmind = require "maxmind"
 
 module.exports = class Server extends require('events').EventEmitter
     constructor: (@opts) ->
@@ -29,6 +30,13 @@ module.exports = class Server extends require('events').EventEmitter
         @app.useChunkedEncodingByDefault = false
 
         @app.set "x-powered-by", "StreamMachine"
+
+        # -- are we behind a geolock? -- #
+
+        @isGeolockEnabled = (@config.geolock && @config.geolock.enabled)
+        if @isGeolockEnabled
+            @logger.info "Enabling 'geolock' for streams"
+            @countryLookup = maxmind.open @config.geolock.config_file
 
         # -- are we behind a proxy? -- #
 
@@ -57,8 +65,14 @@ module.exports = class Server extends require('events').EventEmitter
         @app.param "stream", (req,res,next,key) =>
             # make sure it's a valid stream key
             if key? && s = @core.streams[ key ]
-                req.stream = s
-                next()
+                if @isGeolockEnabled && @isGeolocked req, s, s.opts
+                    if s.opts.geolock.fallback
+                        res.redirect(302, s.opts.geolock.fallback)
+                    else
+                        res.status(403).end("Invalid Country.")
+                else
+                    req.stream = s
+                    next()
             else
                 res.status(404).end "Invalid stream.\n"
 
@@ -195,6 +209,34 @@ module.exports = class Server extends require('events').EventEmitter
                 else
                     # -- straight mp3 listener -- #
                     new @core.Outputs.raw req.stream, req:req, res:res
+
+    #----------
+
+    isGeolocked: (req,stream,opts) ->
+        locked = false
+
+        if opts.geolock && opts.geolock.enabled
+            data = @countryLookup.get req.ip
+            country = null
+
+            if data && data.country
+                country = data.country
+
+            if country && country.iso_code
+                index = opts.geolock.countryCodes.indexOf(country.iso_code)
+
+                if opts.geolock.mode == "blacklist"
+                    locked = index >= 0
+
+                else
+                    locked = index < 0
+
+            if locked && country
+                # request from invalid country...
+                @logger.debug "Request from invalid country: #{country.names.es} (#{country.iso_code})",
+                    ip: req.ip
+
+        locked
 
     #----------
 

@@ -1,0 +1,17 @@
+{
+  "mode": "slave",
+  "slave": {
+    "master": "ws://localhost:8020?password=super_secure_password"
+  },
+  "cluster": 1,
+  "port": 8021,
+  "log": {
+    "stdout": true,
+    "level": "debug"
+  },
+ "behind_proxy": true,
+  "geolock": {
+    "enabled": true,
+    "config_file": "./config/GeoLite2-Country.mmdb"
+  }
+}

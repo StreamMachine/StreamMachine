@@ -48,7 +48,8 @@ module.exports = Stream = (function(_super) {
     ffmpeg_args: null,
     stream_key: null,
     impression_delay: 5000,
-    log_interval: 30000
+    log_interval: 30000,
+    geolock: null
   };
 
   function Stream(key, log, mount, opts) {

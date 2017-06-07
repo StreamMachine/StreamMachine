@@ -1,4 +1,4 @@
-var Server, compression, cors, express, fs, http, path, util, uuid, _,
+var Server, compression, cors, express, fs, http, maxmind, path, util, uuid, _,
   __hasProp = {}.hasOwnProperty,
   __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
 
@@ -19,6 +19,8 @@ http = require("http");
 compression = require("compression");
 
 cors = require("cors");
+
+maxmind = require("maxmind");
 
 module.exports = Server = (function(_super) {
   __extends(Server, _super);
@@ -41,6 +43,11 @@ module.exports = Server = (function(_super) {
     this.app.httpAllowHalfOpen = true;
     this.app.useChunkedEncodingByDefault = false;
     this.app.set("x-powered-by", "StreamMachine");
+    this.isGeolockEnabled = this.config.geolock && this.config.geolock.enabled;
+    if (this.isGeolockEnabled) {
+      this.logger.info("Enabling 'geolock' for streams");
+      this.countryLookup = maxmind.open(this.config.geolock.config_file);
+    }
     if (this.config.behind_proxy) {
       this.logger.info("Enabling 'trust proxy' for Express.js");
       this.app.set("trust proxy", true);
@@ -65,8 +72,16 @@ module.exports = Server = (function(_super) {
       return function(req, res, next, key) {
         var s;
         if ((key != null) && (s = _this.core.streams[key])) {
-          req.stream = s;
-          return next();
+          if (_this.isGeolockEnabled && _this.isGeolocked(req, s, s.opts)) {
+            if (s.opts.geolock.fallback) {
+              return res.redirect(302, s.opts.geolock.fallback);
+            } else {
+              return res.status(403).end("Invalid Country.");
+            }
+          } else {
+            req.stream = s;
+            return next();
+          }
         } else {
           return res.status(404).end("Invalid stream.\n");
         }
@@ -225,6 +240,32 @@ module.exports = Server = (function(_super) {
       };
     })(this));
   }
+
+  Server.prototype.isGeolocked = function(req, stream, opts) {
+    var country, data, index, locked;
+    locked = false;
+    if (opts.geolock && opts.geolock.enabled) {
+      data = this.countryLookup.get(req.ip);
+      country = null;
+      if (data && data.country) {
+        country = data.country;
+      }
+      if (country && country.iso_code) {
+        index = opts.geolock.countryCodes.indexOf(country.iso_code);
+        if (opts.geolock.mode === "blacklist") {
+          locked = index >= 0;
+        } else {
+          locked = index < 0;
+        }
+      }
+      if (locked && country) {
+        this.logger.debug("Request from invalid country: " + country.names.es + " (" + country.iso_code + ")", {
+          ip: req.ip
+        });
+      }
+    }
+    return locked;
+  };
 
   Server.prototype.listen = function(port, cb) {
     this.logger.info("SlaveWorker called listen");
