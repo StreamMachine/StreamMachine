@@ -22,39 +22,49 @@ debug = require("debug")("sm:analytics")
 
 module.exports = class Analytics
     constructor: (@opts,cb) ->
+        # get es url
         @_uri = URL.parse @opts.config.es_uri
 
+        # get reference to the log
         @log = @opts.log
 
+        # get session finalize timeout seconds
         @_timeout_sec = Number(@opts.config.finalize_secs)
 
+        # is redis?
         if @opts.redis
-
+            # get redist client reference
             @redis = @opts.redis.client
 
+        # get full es url  and prefix
         es_uri = "http://#{@_uri.hostname}:#{@_uri.port||9200}"
         @idx_prefix = @_uri.pathname.substr(1)
 
         @log.debug "Connecting to Elasticsearch at #{es_uri} with prefix of #{@idx_prefix}"
         debug "Connecting to ES at #{es_uri}, prefix #{@idx_prefix}"
 
+        # setup api version variable
         apiVersion = '1.7'
         if (typeof @opts.config.es_api_version != 'undefined')
             apiVersion = @opts.config.es_api_version.toString()
 
+        # this.es = new elastic search client
         @es = new elasticsearch.Client
             host:           es_uri
             apiVersion:     apiVersion
             requestTimeout: @opts.config.request_timeout || 30000
 
+        # this.idx_batch = new BatchedQueue
         @idx_batch  = new BatchedQueue
             batch:      @opts.config.index_batch
             latency:    @opts.config.index_latency
 
+        # this.idx_writer = new IdxWriter passing in this.es
         @idx_writer = new IdxWriter @es, @log.child(submodule:"idx_writer")
         @idx_writer.on "error", (err) =>
             @log.error err
 
+        # pipe to the idx writer any batch operations
         @idx_batch.pipe(@idx_writer)
 
         # track open sessions
@@ -64,6 +74,7 @@ module.exports = class Analytics
 
         # -- Load our Templates -- #
 
+        # this.loadTemplates() - loads templates into es, then calls the callback
         @_loadTemplates (err) =>
             if err
                 console.error err
