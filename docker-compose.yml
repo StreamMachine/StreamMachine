@@ -1,0 +1,19 @@
+version: '3.3'
+services:
+  primary:
+    image: scprdev/streammachine:0.0.1
+    container_name: primary
+    environment:
+      - CONFIG_FILE=/streammachine/config/primary.json
+    volumes:
+      - ./config/dev/:/streammachine/config
+    deploy:
+      replicas: 1
+  replica:
+    image: scprdev/streammachine:0.0.1
+    environment:
+      - CONFIG_FILE=/streammachine/config/replica.json
+    volumes:
+      - ./config/dev/:/streammachine/config
+    deploy:
+      replicas: 3
