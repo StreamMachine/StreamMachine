@@ -9,46 +9,46 @@ CoreObj = {
     doc_values: true
   },
   stream: {
-    type: "string",
-    index: "not_analyzed",
+    type: "keyword",
+    index: "true",
     doc_values: true
   },
   session_id: {
-    type: "string",
-    index: "not_analyzed",
+    type: "keyword",
+    index: "true",
     doc_values: true
   },
   client: {
     type: "object",
     properties: {
       session_id: {
-        type: "string",
-        index: "not_analyzed",
+        type: "keyword",
+        index: "true",
         doc_values: true
       },
       user_id: {
-        type: "string",
-        index: "not_analyzed",
+        type: "keyword",
+        index: "true",
         doc_values: true
       },
       output: {
-        type: "string",
-        index: "not_analyzed",
+        type: "keyword",
+        index: "true",
         doc_values: true
       },
       ip: {
-        type: "string",
-        index: "not_analyzed",
+        type: "keyword",
+        index: "true",
         doc_values: true
       },
       ua: {
-        type: "string",
-        index: "not_analyzed",
+        type: "keyword",
+        index: "true",
         doc_values: true
       },
       path: {
-        type: "string",
-        index: "not_analyzed",
+        type: "keyword",
+        index: "true",
         doc_values: true
       }
     }
@@ -87,17 +87,14 @@ module.exports = {
       }
     },
     mappings: {
-      start: {
-        "_all": {
-          enabled: false
-        },
-        properties: _.extend({}, CoreObj)
-      },
-      listen: {
-        "_all": {
-          enabled: false
-        },
+      doc: {
         properties: _.extend({}, CoreObj, {
+          type: {
+            type: "keyword"
+          },
+          name: {
+            type: "text"
+          },
           duration: {
             type: "float"
           },

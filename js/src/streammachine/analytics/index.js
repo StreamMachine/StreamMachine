@@ -12,7 +12,7 @@ tz = require("timezone");
 
 nconf = require("nconf");
 
-elasticsearch = require("elasticsearch");
+elasticsearch = require("@elastic/elasticsearch");
 
 BatchedQueue = require("../util/batched_queue");
 
@@ -32,8 +32,8 @@ module.exports = Analytics = (function() {
     if (this.opts.redis) {
       this.redis = this.opts.redis.client;
     }
-    es_uri = "http://" + this._uri.hostname + ":" + (this._uri.port || 9200);
-    this.idx_prefix = this._uri.pathname.substr(1);
+    es_uri = this.opts.config.es_uri;
+    this.idx_prefix = this.opts.config.es_prefix;
     this.log.debug("Connecting to Elasticsearch at " + es_uri + " with prefix of " + this.idx_prefix);
     debug("Connecting to ES at " + es_uri + ", prefix " + this.idx_prefix);
     apiVersion = '1.7';
@@ -41,7 +41,7 @@ module.exports = Analytics = (function() {
       apiVersion = this.opts.config.es_api_version.toString();
     }
     this.es = new elasticsearch.Client({
-      host: es_uri,
+      node: es_uri,
       apiVersion: apiVersion,
       requestTimeout: this.opts.config.request_timeout || 30000
     });
@@ -102,6 +102,7 @@ module.exports = Analytics = (function() {
       return function() {
         if (errors.length > 0) {
           debug("Failed to load one or more ES templates: " + (errors.join(" | ")));
+          _this.log.info(errors);
           return cb(new Error("Failed to load index templates: " + (errors.join(" | "))));
         } else {
           debug("ES templates loaded successfully.");
@@ -117,6 +118,7 @@ module.exports = Analytics = (function() {
       tmplt = _.extend({}, obj, {
         template: "" + this.idx_prefix + "-" + t + "-*"
       });
+      this.log.info(tmplt);
       _results.push(this.es.indices.putTemplate({
         name: "" + this.idx_prefix + "-" + t + "-template",
         body: tmplt

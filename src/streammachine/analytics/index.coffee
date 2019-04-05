@@ -3,7 +3,7 @@ URL     = require "url"
 winston = require "winston"
 tz      = require "timezone"
 nconf   = require "nconf"
-elasticsearch = require "elasticsearch"
+elasticsearch = require "@elastic/elasticsearch"
 
 BatchedQueue    = require "../util/batched_queue"
 IdxWriter       = require "./idx_writer"
@@ -32,8 +32,8 @@ module.exports = class Analytics
 
             @redis = @opts.redis.client
 
-        es_uri = "http://#{@_uri.hostname}:#{@_uri.port||9200}"
-        @idx_prefix = @_uri.pathname.substr(1)
+        es_uri = @opts.config.es_uri
+        @idx_prefix = @opts.config.es_prefix
 
         @log.debug "Connecting to Elasticsearch at #{es_uri} with prefix of #{@idx_prefix}"
         debug "Connecting to ES at #{es_uri}, prefix #{@idx_prefix}"
@@ -43,7 +43,7 @@ module.exports = class Analytics
             apiVersion = @opts.config.es_api_version.toString()
 
         @es = new elasticsearch.Client
-            host:           es_uri
+            node:           es_uri
             apiVersion:     apiVersion
             requestTimeout: @opts.config.request_timeout || 30000
 
@@ -110,6 +110,7 @@ module.exports = class Analytics
         _loaded = _.after Object.keys(ESTemplates).length, =>
             if errors.length > 0
                 debug "Failed to load one or more ES templates: #{errors.join(" | ")}"
+                @log.info errors
                 cb new Error "Failed to load index templates: #{ errors.join(" | ") }"
             else
                 debug "ES templates loaded successfully."
@@ -119,6 +120,7 @@ module.exports = class Analytics
             debug "Loading ES mapping for #{@idx_prefix}-#{t}"
             @log.info "Loading Elasticsearch mappings for #{@idx_prefix}-#{t}"
             tmplt = _.extend {}, obj, template:"#{@idx_prefix}-#{t}-*"
+            @log.info tmplt
             @es.indices.putTemplate name:"#{@idx_prefix}-#{t}-template", body:tmplt, (err) =>
                 errors.push err if err
                 _loaded()
