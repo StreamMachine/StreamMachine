@@ -64,19 +64,14 @@ module.exports = {
       }
     },
     mappings: {
-      session: {
-        "_all": {
-          enabled: false
+      properties: _.extend({}, CoreObj, {
+        duration: {
+          type: "float"
         },
-        properties: _.extend({}, CoreObj, {
-          duration: {
-            type: "float"
-          },
-          kbytes: {
-            type: "long"
-          }
-        })
-      }
+        kbytes: {
+          type: "long"
+        }
+      })
     }
   },
   listens: {
@@ -87,31 +82,29 @@ module.exports = {
       }
     },
     mappings: {
-      doc: {
-        properties: _.extend({}, CoreObj, {
-          type: {
-            type: "keyword"
-          },
-          name: {
-            type: "text"
-          },
-          duration: {
-            type: "float"
-          },
-          kbytes: {
-            type: "long"
-          },
-          offsetSeconds: {
-            type: "integer",
-            doc_values: true
-          },
-          contentTime: {
-            type: "date",
-            format: "date_time",
-            doc_values: true
-          }
-        })
-      }
+      properties: _.extend({}, CoreObj, {
+        type: {
+          type: "keyword"
+        },
+        name: {
+          type: "text"
+        },
+        duration: {
+          type: "float"
+        },
+        kbytes: {
+          type: "long"
+        },
+        offsetSeconds: {
+          type: "integer",
+          doc_values: true
+        },
+        contentTime: {
+          type: "date",
+          format: "date_time",
+          doc_values: true
+        }
+      })
     }
   }
 };

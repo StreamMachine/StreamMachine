@@ -1,7 +1,9 @@
 version: '3.3'
 services:
   primary:
-    image: scprdev/streammachine:0.0.1
+    build:
+      context: .
+    entrypoint: ./docker-entrypoint.sh
     container_name: primary
     environment:
       - CONFIG_FILE=/streammachine/config/primary.json
@@ -13,6 +15,7 @@ services:
     ports:
       - 8022:8022
   replica:
+    entrypoint: ./docker-entrypoint.sh
     container_name: replica
     build:
       context: .

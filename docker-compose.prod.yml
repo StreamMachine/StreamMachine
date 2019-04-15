@@ -1,0 +1,32 @@
+version: '3.3'
+services:
+  primary:
+    image: scprdev/streammachine:0.0.1
+    entrypoint: ./docker-entrypoint.sh
+    container_name: primary
+    environment:
+    - CONFIG_FILE=/streammachine/config/primary.json
+    volumes:
+    - ./config/dev/:/streammachine/config
+    - /tmp/streammachine/shared/:/streammachine/app/shared
+    deploy:
+      replicas: 1
+    ports:
+    - 8022:8022
+    replica:
+      container_name: replica
+      entrypoint: ./docker-entrypoint.sh
+      image: scprdev/streammachine:0.0.1
+      environment:
+        - CONFIG_FILE=/streammachine/config/replica.json
+      volumes:
+        - ./config/dev/:/streammachine/config
+      deploy:
+        replicas: 3
+  redis:
+    image: redis:4.0.1-alpine
+    command: redis-server
+    container_name: redis
+    restart: always
+    ports:
+    - 6379:6379/tcp
