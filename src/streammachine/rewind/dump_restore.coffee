@@ -92,7 +92,10 @@ module.exports = class RewindDumpRestore extends require('events').EventEmitter
         if d = @_queue.shift()
             d._dump (err,file,timing) =>
                 if err
-                    @log.error "Dump for #{d.key} errored: #{err}", stream:d.stream.key
+                    if d.stream
+                        @log.error "Dump for #{d.key} errored: #{err}", stream:d.stream.key
+                    else
+                        @log.error "Dump for #{d.key} errored (with no stream): #{err}"
                 else
                     @log.debug "Dump for #{d.key} succeeded in #{ timing }ms."
 

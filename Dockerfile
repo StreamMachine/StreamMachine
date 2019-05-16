@@ -74,5 +74,7 @@ COPY . $HOME
 
 RUN ln -s ~/bin/ffmpeg /usr/bin/ffmpeg
 
+RUN chown -R node:node /streammachine/app/shared
+
 USER node
 

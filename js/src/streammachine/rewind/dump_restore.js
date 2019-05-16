@@ -125,9 +125,13 @@ module.exports = RewindDumpRestore = (function(_super) {
       return d._dump((function(_this) {
         return function(err, file, timing) {
           if (err) {
-            _this.log.error("Dump for " + d.key + " errored: " + err, {
-              stream: d.stream.key
-            });
+            if (d.stream) {
+              _this.log.error("Dump for " + d.key + " errored: " + err, {
+                stream: d.stream.key
+              });
+            } else {
+              _this.log.error("Dump for " + d.key + " errored (with no stream): " + err);
+            }
           } else {
             _this.log.debug("Dump for " + d.key + " succeeded in " + timing + "ms.");
           }
