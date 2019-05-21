@@ -40,12 +40,14 @@ module.exports = class TranscodingSource extends require("./base")
             @ffmpeg.on "start", (cmd) =>
                 @log?.info "ffmpeg started with #{ cmd }"
 
-            @ffmpeg.on "error", (err) =>
+            @ffmpeg.on "error", (err, stdout, stderr) =>
                 if err.code == "ENOENT"
                     @log?.error "ffmpeg failed to start."
                     @disconnect()
                 else
                     @log?.error "ffmpeg transcoding error: #{ err }"
+                    @log?.error "ffmpeg transcoding error stdout: #{ stdout }"
+                    @log?.error "ffmpeg transcoding error stderr: #{ stderr }"
                     @disconnect()
 
             @ffmpeg.writeToStream @parser

@@ -3,6 +3,10 @@ var CoreObj, _;
 _ = require("underscore");
 
 CoreObj = {
+  type: {
+    type: "keyword",
+    index: "true"
+  },
   time: {
     type: "date",
     format: "date_time",
@@ -83,9 +87,6 @@ module.exports = {
     },
     mappings: {
       properties: _.extend({}, CoreObj, {
-        type: {
-          type: "keyword"
-        },
         name: {
           type: "text"
         },

@@ -50,8 +50,8 @@ module.exports = TranscodingSource = (function(_super) {
           var _ref;
           return (_ref = _this.log) != null ? _ref.info("ffmpeg started with " + cmd) : void 0;
         });
-        _this.ffmpeg.on("error", function(err) {
-          var _ref, _ref1;
+        _this.ffmpeg.on("error", function(err, stdout, stderr) {
+          var _ref, _ref1, _ref2, _ref3;
           if (err.code === "ENOENT") {
             if ((_ref = _this.log) != null) {
               _ref.error("ffmpeg failed to start.");
@@ -60,6 +60,12 @@ module.exports = TranscodingSource = (function(_super) {
           } else {
             if ((_ref1 = _this.log) != null) {
               _ref1.error("ffmpeg transcoding error: " + err);
+            }
+            if ((_ref2 = _this.log) != null) {
+              _ref2.error("ffmpeg transcoding error stdout: " + stdout);
+            }
+            if ((_ref3 = _this.log) != null) {
+              _ref3.error("ffmpeg transcoding error stderr: " + stderr);
             }
             return _this.disconnect();
           }

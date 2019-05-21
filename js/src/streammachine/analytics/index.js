@@ -154,12 +154,12 @@ module.exports = Analytics = (function() {
           case "session_start":
             _this.idx_batch.write({
               index: idx[0],
-              type: "start",
               body: {
                 time: new Date(obj.time),
                 session_id: obj.client.session_id,
                 stream: obj.stream_group || obj.stream,
-                client: obj.client
+                client: obj.client,
+                type: "start"
               }
             });
             if (typeof cb === "function") {
@@ -170,7 +170,6 @@ module.exports = Analytics = (function() {
             _this._getStashedDurationFor(obj.client.session_id, obj.duration, function(err, dur) {
               _this.idx_batch.write({
                 index: idx[0],
-                type: "listen",
                 body: {
                   session_id: obj.client.session_id,
                   time: new Date(obj.time),
@@ -180,7 +179,8 @@ module.exports = Analytics = (function() {
                   stream: obj.stream,
                   client: obj.client,
                   offsetSeconds: obj.offsetSeconds,
-                  contentTime: obj.contentTime
+                  contentTime: obj.contentTime,
+                  type: "listen"
                 }
               });
               return typeof cb === "function" ? cb(null) : void 0;
@@ -330,7 +330,8 @@ module.exports = Analytics = (function() {
               client: start.client,
               kbytes: totals.kbytes,
               duration: totals.duration,
-              connected: (Number(totals.last_listen) - Number(ts || start.time)) / 1000
+              connected: (Number(totals.last_listen) - Number(ts || start.time)) / 1000,
+              type: "session"
             };
             return cb(null, session);
           });
@@ -344,7 +345,6 @@ module.exports = Analytics = (function() {
     index_date = tz(session.time, "%F");
     return this.es.index({
       index: "" + this.idx_prefix + "-sessions-" + index_date,
-      type: "session",
       body: session
     }, (function(_this) {
       return function(err) {
@@ -357,6 +357,9 @@ module.exports = Analytics = (function() {
     var body;
     body = {
       query: {
+        term: {
+          type: "start"
+        },
         constant_score: {
           filter: {
             term: {
@@ -375,7 +378,6 @@ module.exports = Analytics = (function() {
     return this._indicesForTimeRange("listens", new Date(), "-72 hours", (function(_this) {
       return function(err, indices) {
         return _this.es.search({
-          type: "start",
           body: body,
           index: indices,
           ignoreUnavailable: true
@@ -383,11 +385,13 @@ module.exports = Analytics = (function() {
           if (err) {
             return cb(new Error("Error querying session start for " + id + ": " + err));
           }
-          if (res.hits.hits.length > 0) {
+          if (res.hits && res.hits.hits.length > 0) {
             return cb(null, _.extend({}, res.hits.hits[0]._source, {
               time: new Date(res.hits.hits[0]._source.time)
             }));
           } else {
+            _this.log.error("Could not find type=start res.hits");
+            _this.log.error(res);
             return cb(null, null);
           }
         });
@@ -399,12 +403,18 @@ module.exports = Analytics = (function() {
     var body;
     body = {
       query: {
-        constant_score: {
-          filter: {
-            term: {
-              "session_id": id
+        bool: {
+          must: [
+            {
+              match: {
+                "session_id": id
+              }
+            }, {
+              match: {
+                "type": "session"
+              }
             }
-          }
+          ]
         }
       },
       sort: {
@@ -417,7 +427,6 @@ module.exports = Analytics = (function() {
     return this._indicesForTimeRange("sessions", new Date(), "-72 hours", (function(_this) {
       return function(err, indices) {
         return _this.es.search({
-          type: "session",
           body: body,
           index: indices,
           ignoreUnavailable: true
@@ -425,10 +434,14 @@ module.exports = Analytics = (function() {
           if (err) {
             return cb(new Error("Error querying for old session " + id + ": " + err));
           }
-          if (res.hits.hits.length === 0) {
+          if (res.hits && res.hits.length === 0) {
             return cb(null, null);
           } else {
-            return cb(null, new Date(res.hits.hits[0]._source.time));
+            if (!res.hits) {
+              return _this.log.error("Could not find type=session res.hits");
+            } else {
+              return cb(null, new Date(res.hits[0]._source.time));
+            }
           }
         });
       };

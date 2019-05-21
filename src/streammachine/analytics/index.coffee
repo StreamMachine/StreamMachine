@@ -148,11 +148,12 @@ module.exports = class Analytics
         @_indicesForTimeRange "listens", time, (err,idx) =>
             switch obj.type
                 when "session_start"
-                    @idx_batch.write index:idx[0], type:"start", body:
+                    @idx_batch.write index:idx[0], body:
                         time:       new Date(obj.time)
                         session_id: obj.client.session_id
                         stream:     obj.stream_group || obj.stream
                         client:     obj.client
+                        type:       "start"
 
                     cb? null
 
@@ -161,7 +162,7 @@ module.exports = class Analytics
                 when "listen"
                     # do we know of other duration for this session?
                     @_getStashedDurationFor obj.client.session_id, obj.duration, (err,dur) =>
-                        @idx_batch.write index:idx[0], type:"listen", body:
+                        @idx_batch.write index:idx[0], body:
                             session_id:         obj.client.session_id
                             time:               new Date(obj.time)
                             kbytes:             obj.kbytes
@@ -171,6 +172,7 @@ module.exports = class Analytics
                             client:             obj.client
                             offsetSeconds:      obj.offsetSeconds
                             contentTime:        obj.contentTime
+                            type:               "listen"
 
                         cb? null
 
@@ -312,6 +314,7 @@ module.exports = class Analytics
                         kbytes:     totals.kbytes
                         duration:   totals.duration
                         connected:  ( Number(totals.last_listen) - Number(ts||start.time) ) / 1000
+                        type: "session"
 
                     cb null, session
 
@@ -321,7 +324,7 @@ module.exports = class Analytics
         # write one index per day of data
         index_date = tz(session.time,"%F")
 
-        @es.index index:"#{@idx_prefix}-sessions-#{index_date}", type:"session", body:session, (err) =>
+        @es.index index:"#{@idx_prefix}-sessions-#{index_date}", body:session, (err) =>
             cb err
 
     #----------
@@ -331,6 +334,8 @@ module.exports = class Analytics
 
         body =
             query:
+                term:
+                    type: "start"
                 constant_score:
                     filter:
                         term:
@@ -342,12 +347,14 @@ module.exports = class Analytics
         # session start is allowed to be anywhere in the last 72 hours
         # FIXME: Is this reasonable? What do we want to do with long sessions?
         @_indicesForTimeRange "listens", new Date(), "-72 hours", (err,indices) =>
-            @es.search type:"start", body:body, index:indices, ignoreUnavailable:true, (err,res) =>
+            @es.search body:body, index:indices, ignoreUnavailable:true, (err,res) =>
                 return cb new Error "Error querying session start for #{id}: #{err}" if err
 
-                if res.hits.hits.length > 0
+                if res.hits && res.hits.hits.length > 0
                     cb null, _.extend {}, res.hits.hits[0]._source, time:new Date(res.hits.hits[0]._source.time)
                 else
+                    @log.error "Could not find type=start res.hits"
+                    @log.error res
                     cb null, null
 
     #----------
@@ -357,23 +364,33 @@ module.exports = class Analytics
 
         body =
             query:
-                constant_score:
-                    filter:
-                        term:
-                            "session_id":id
+                bool:
+                    must: [
+                        {
+                            match:
+                                "session_id": id
+                        },
+                        {
+                            match:
+                                "type": "session"
+                        }
+                    ]
             sort:
                 time:{order:"desc"}
             size:1
 
 
         @_indicesForTimeRange "sessions", new Date(), "-72 hours", (err,indices) =>
-            @es.search type:"session", body:body, index:indices, ignoreUnavailable:true, (err,res) =>
+            @es.search body:body, index:indices, ignoreUnavailable:true, (err,res) =>
                 return cb new Error "Error querying for old session #{id}: #{err}" if err
 
-                if res.hits.hits.length == 0
+                if res.hits && res.hits.length == 0
                     cb null, null
                 else
-                    cb null, new Date(res.hits.hits[0]._source.time)
+                    if !res.hits
+                        @log.error "Could not find type=session res.hits"
+                    else
+                        cb null, new Date(res.hits[0]._source.time)
 
     #----------
 
