@@ -153,7 +153,7 @@ describe "Rewind Buffer", ->
                 done()
 
         # we'll use this in the next two tests
-        rewind_buf = new Buffer 0
+        rewind_buf = Buffer.alloc 0
 
         it "can dump its rewind buffer", (done) ->
             pt = new require("stream").PassThrough()

@@ -52,7 +52,7 @@ module.exports = ChunkGenerator = (function(_super) {
         chunk = {
           ts: new Date(Number(_this.start_ts) + (_this._count_f + c) * _this.chunk_duration),
           duration: _this.chunk_duration,
-          data: new Buffer(0)
+          data: Buffer.alloc(0)
         };
         _this.push(chunk);
         return af();
@@ -76,7 +76,7 @@ module.exports = ChunkGenerator = (function(_super) {
         chunk = {
           ts: new Date(Number(_this.start_ts) - (_this._count_b + c) * _this.chunk_duration),
           duration: _this.chunk_duration,
-          data: new Buffer(0)
+          data: Buffer.alloc(0)
         };
         _this.push(chunk);
         return af();

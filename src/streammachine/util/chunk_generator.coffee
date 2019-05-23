@@ -34,7 +34,7 @@ module.exports = class ChunkGenerator extends require("stream").Readable
             chunk =
                 ts:         new Date( Number(@start_ts) + (@_count_f+c) * @chunk_duration )
                 duration:   @chunk_duration
-                data:       new Buffer(0)
+                data:       Buffer.alloc(0)
 
             @push chunk
             af()
@@ -50,7 +50,7 @@ module.exports = class ChunkGenerator extends require("stream").Readable
             chunk =
                 ts:         new Date( Number(@start_ts) - (@_count_b+c) * @chunk_duration )
                 duration:   @chunk_duration
-                data:       new Buffer(0)
+                data:       Buffer.alloc(0)
 
             @push chunk
             af()

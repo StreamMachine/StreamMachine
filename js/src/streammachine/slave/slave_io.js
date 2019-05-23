@@ -99,7 +99,7 @@ module.exports = SlaveIO = (function(_super) {
     })(this));
     this.io.on("audio", (function(_this) {
       return function(obj) {
-        obj.chunk.data = new Buffer(obj.chunk.data);
+        obj.chunk.data = Buffer.from(obj.chunk.data);
         obj.chunk.ts = new Date(obj.chunk.ts);
         return _this.emit("audio:" + obj.stream, obj.chunk);
       };

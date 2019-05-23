@@ -77,7 +77,7 @@ module.exports = IcecastSource = (function(_super) {
         });
         _this.sock.write("SOURCE /" + _this.opts.stream + " HTTP/1.0\r\n");
         if (_this.opts.password) {
-          auth = new Buffer("source:" + _this.opts.password, 'ascii').toString("base64");
+          auth = Buffer.from("source:" + _this.opts.password, 'ascii').toString("base64");
           _this.sock.write("Authorization: Basic " + auth + "\r\n\r\n");
           debug("Writing auth with " + auth + ".");
         } else {

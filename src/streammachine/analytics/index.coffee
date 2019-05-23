@@ -314,7 +314,6 @@ module.exports = class Analytics
                         kbytes:     totals.kbytes
                         duration:   totals.duration
                         connected:  ( Number(totals.last_listen) - Number(ts||start.time) ) / 1000
-                        type: "session"
 
                     cb null, session
 
@@ -323,7 +322,7 @@ module.exports = class Analytics
     _storeSession: (session,cb) ->
         # write one index per day of data
         index_date = tz(session.time,"%F")
-
+        session.type = "session"
         @es.index index:"#{@idx_prefix}-sessions-#{index_date}", body:session, (err) =>
             cb err
 
@@ -334,12 +333,17 @@ module.exports = class Analytics
 
         body =
             query:
-                term:
-                    type: "start"
-                constant_score:
-                    filter:
-                        term:
-                            "session_id":id
+                bool:
+                    must: [
+                        {
+                            match:
+                                "session_id": id
+                        },
+                        {
+                            match:
+                                "type": "start"
+                        }
+                    ]
             sort:
                 time:{order:"desc"}
             size:1
@@ -350,11 +354,10 @@ module.exports = class Analytics
             @es.search body:body, index:indices, ignoreUnavailable:true, (err,res) =>
                 return cb new Error "Error querying session start for #{id}: #{err}" if err
 
-                if res.hits && res.hits.hits.length > 0
+                if res.hits && res.hits.total.value > 0
                     cb null, _.extend {}, res.hits.hits[0]._source, time:new Date(res.hits.hits[0]._source.time)
                 else
-                    @log.error "Could not find type=start res.hits"
-                    @log.error res
+                    @log.error "Could not find type=start res.hits" + id
                     cb null, null
 
     #----------
@@ -384,13 +387,10 @@ module.exports = class Analytics
             @es.search body:body, index:indices, ignoreUnavailable:true, (err,res) =>
                 return cb new Error "Error querying for old session #{id}: #{err}" if err
 
-                if res.hits && res.hits.length == 0
+                if !res.hits || res.hits.total.value == 0
                     cb null, null
                 else
-                    if !res.hits
-                        @log.error "Could not find type=session res.hits"
-                    else
-                        cb null, new Date(res.hits[0]._source.time)
+                    cb null, new Date(res.hits.hits[0]._source.time)
 
     #----------
 
@@ -423,9 +423,9 @@ module.exports = class Analytics
             @es.search type:"listen", index:indices, body:body, ignoreUnavailable:true, (err,res) =>
                 return cb new Error "Error querying listens to finalize session #{id}: #{err}" if err
 
-                if res.hits.total > 0
+                if res.hits.total.value > 0
                     cb null,
-                        requests:       res.hits.total
+                        requests:       res.hits.total.value
                         duration:       res.aggregations.duration.value
                         kbytes:         res.aggregations.kbytes.value
                         last_listen:    new Date(res.aggregations.last_listen.value)

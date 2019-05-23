@@ -65,7 +65,7 @@ module.exports = class IcecastSource extends require("events").EventEmitter
 
             if @opts.password
                 # username doesn't matter.
-                auth = new Buffer("source:#{@opts.password}",'ascii').toString("base64")
+                auth = Buffer.from("source:#{@opts.password}",'ascii').toString("base64")
                 @sock.write "Authorization: Basic #{auth}\r\n\r\n"
                 debug "Writing auth with #{ auth }."
 

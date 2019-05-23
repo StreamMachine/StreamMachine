@@ -67,7 +67,7 @@ module.exports = class HLSIndex
 
         # -- build our header -- #
 
-        head = new Buffer """
+        head = Buffer.from """
         #EXTM3U
         #EXT-X-VERSION:3
         #EXT-X-TARGETDURATION:#{@_segment_duration}
@@ -77,7 +77,7 @@ module.exports = class HLSIndex
 
         """
 
-        short_head = new Buffer """
+        short_head = Buffer.from """
         #EXTM3U
         #EXT-X-VERSION:3
         #EXT-X-TARGETDURATION:#{@_segment_duration}
@@ -106,7 +106,7 @@ module.exports = class HLSIndex
                 # is the segment where we expect it in the timeline?
                 has_disc = !(seg.discontinuitySeq == dseq)
 
-                seg.idx_buffer = new Buffer """
+                seg.idx_buffer = Buffer.from """
                 #{ if has_disc then "#EXT-X-DISCONTINUITY\n" else "" }#EXTINF:#{seg.duration / 1000},
                 #EXT-X-PROGRAM-DATE-TIME:#{@tz(seg.ts_actual,"%FT%T.%3N%:z")}
                 /#{@stream.key}/ts/#{seg.id}.#{@stream.opts.format}
@@ -151,7 +151,7 @@ module.exports = class HLSIndex
     #----------
 
     short_index: (session,cb) ->
-        session = if session then new Buffer(session+"\n") else new Buffer("\n")
+        session = if session then Buffer.from(session+"\n") else Buffer.from("\n")
 
         if !@_short_header
             return cb null, null
@@ -162,7 +162,7 @@ module.exports = class HLSIndex
     #----------
 
     index: (session,cb) ->
-        session = if session then new Buffer(session+"\n") else new Buffer("\n")
+        session = if session then Buffer.from(session+"\n") else Buffer.from("\n")
 
         if !@_header
             return cb null, null

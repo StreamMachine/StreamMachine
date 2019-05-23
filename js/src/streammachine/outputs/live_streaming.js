@@ -10,7 +10,7 @@ uuid = require("node-uuid");
 
 BaseOutput = require("./base");
 
-PTS_TAG = new Buffer((function() {
+PTS_TAG = Buffer.from((function() {
   var _i, _len, _ref, _results;
   _ref = "49 44 33 04 00 00 00 00 00 3F 50 52 49 56 00 00 00 35 00 00 63 6F 6D\n2E 61 70 70 6C 65 2E 73 74 72 65 61 6D 69 6E 67 2E 74 72 61 6E 73 70\n6F 72 74 53 74 72 65 61 6D 54 69 6D 65 73 74 61 6D 70 00 00 00 00 00\n00 00 00 00".split(/\s+/);
   _results = [];
@@ -40,7 +40,7 @@ module.exports = LiveStreaming = (function(_super) {
         }
         tag = null;
         if (info.pts) {
-          tag = new Buffer(PTS_TAG);
+          tag = Buffer.from(PTS_TAG);
           if (info.pts > Math.pow(2, 32) - 1) {
             tag[0x44] = 0x01;
             tag.writeUInt32BE(info.pts - (Math.pow(2, 32) - 1), 0x45);

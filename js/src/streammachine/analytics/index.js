@@ -330,8 +330,7 @@ module.exports = Analytics = (function() {
               client: start.client,
               kbytes: totals.kbytes,
               duration: totals.duration,
-              connected: (Number(totals.last_listen) - Number(ts || start.time)) / 1000,
-              type: "session"
+              connected: (Number(totals.last_listen) - Number(ts || start.time)) / 1000
             };
             return cb(null, session);
           });
@@ -343,6 +342,7 @@ module.exports = Analytics = (function() {
   Analytics.prototype._storeSession = function(session, cb) {
     var index_date;
     index_date = tz(session.time, "%F");
+    session.type = "session";
     return this.es.index({
       index: "" + this.idx_prefix + "-sessions-" + index_date,
       body: session
@@ -357,15 +357,18 @@ module.exports = Analytics = (function() {
     var body;
     body = {
       query: {
-        term: {
-          type: "start"
-        },
-        constant_score: {
-          filter: {
-            term: {
-              "session_id": id
+        bool: {
+          must: [
+            {
+              match: {
+                "session_id": id
+              }
+            }, {
+              match: {
+                "type": "start"
+              }
             }
-          }
+          ]
         }
       },
       sort: {
@@ -385,13 +388,12 @@ module.exports = Analytics = (function() {
           if (err) {
             return cb(new Error("Error querying session start for " + id + ": " + err));
           }
-          if (res.hits && res.hits.hits.length > 0) {
+          if (res.hits && res.hits.total.value > 0) {
             return cb(null, _.extend({}, res.hits.hits[0]._source, {
               time: new Date(res.hits.hits[0]._source.time)
             }));
           } else {
-            _this.log.error("Could not find type=start res.hits");
-            _this.log.error(res);
+            _this.log.error("Could not find type=start res.hits" + id);
             return cb(null, null);
           }
         });
@@ -434,14 +436,10 @@ module.exports = Analytics = (function() {
           if (err) {
             return cb(new Error("Error querying for old session " + id + ": " + err));
           }
-          if (res.hits && res.hits.length === 0) {
+          if (!res.hits || res.hits.total.value === 0) {
             return cb(null, null);
           } else {
-            if (!res.hits) {
-              return _this.log.error("Could not find type=session res.hits");
-            } else {
-              return cb(null, new Date(res.hits[0]._source.time));
-            }
+            return cb(null, new Date(res.hits.hits[0]._source.time));
           }
         });
       };
@@ -506,9 +504,9 @@ module.exports = Analytics = (function() {
           if (err) {
             return cb(new Error("Error querying listens to finalize session " + id + ": " + err));
           }
-          if (res.hits.total > 0) {
+          if (res.hits.total.value > 0) {
             return cb(null, {
-              requests: res.hits.total,
+              requests: res.hits.total.value,
               duration: res.aggregations.duration.value,
               kbytes: res.aggregations.kbytes.value,
               last_listen: new Date(res.aggregations.last_listen.value)

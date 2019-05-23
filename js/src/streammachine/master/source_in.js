@@ -141,7 +141,7 @@ module.exports = SourceIn = (function(_super) {
     var pass, type, user, value, _ref, _ref1;
     _ref = header.split(" "), type = _ref[0], value = _ref[1];
     if (type.toLowerCase() === "basic") {
-      value = new Buffer(value, 'base64').toString('ascii');
+      value = Buffer.from(value, 'base64').toString('ascii');
       _ref1 = value.split(":"), user = _ref1[0], pass = _ref1[1];
       if (pass === stream_passwd) {
         return true;

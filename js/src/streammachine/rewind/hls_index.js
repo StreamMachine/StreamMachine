@@ -64,8 +64,8 @@ module.exports = HLSIndex = (function() {
     if (_short_start < 2) {
       _short_start = 2;
     }
-    head = new Buffer("#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:" + this._segment_duration + "\n#EXT-X-MEDIA-SEQUENCE:" + segs[2].id + "\n#EXT-X-DISCONTINUITY-SEQUENCE:" + segs[2].discontinuitySeq + "\n#EXT-X-INDEPENDENT-SEGMENTS\n");
-    short_head = new Buffer("#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:" + this._segment_duration + "\n#EXT-X-MEDIA-SEQUENCE:" + segs[_short_start].id + "\n#EXT-X-DISCONTINUITY-SEQUENCE:" + segs[_short_start].discontinuitySeq + "\n#EXT-X-INDEPENDENT-SEGMENTS\n");
+    head = Buffer.from("#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:" + this._segment_duration + "\n#EXT-X-MEDIA-SEQUENCE:" + segs[2].id + "\n#EXT-X-DISCONTINUITY-SEQUENCE:" + segs[2].discontinuitySeq + "\n#EXT-X-INDEPENDENT-SEGMENTS\n");
+    short_head = Buffer.from("#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:" + this._segment_duration + "\n#EXT-X-MEDIA-SEQUENCE:" + segs[_short_start].id + "\n#EXT-X-DISCONTINUITY-SEQUENCE:" + segs[_short_start].discontinuitySeq + "\n#EXT-X-INDEPENDENT-SEGMENTS\n");
     idx_segs = [];
     idx_length = 0;
     seg_ids = (function() {
@@ -83,7 +83,7 @@ module.exports = HLSIndex = (function() {
       seg = _ref[i];
       if (!this._segment_idx[seg.id]) {
         has_disc = !(seg.discontinuitySeq === dseq);
-        seg.idx_buffer = new Buffer("" + (has_disc ? "#EXT-X-DISCONTINUITY\n" : "") + "#EXTINF:" + (seg.duration / 1000) + ",\n#EXT-X-PROGRAM-DATE-TIME:" + (this.tz(seg.ts_actual, "%FT%T.%3N%:z")) + "\n/" + this.stream.key + "/ts/" + seg.id + "." + this.stream.opts.format);
+        seg.idx_buffer = Buffer.from("" + (has_disc ? "#EXT-X-DISCONTINUITY\n" : "") + "#EXTINF:" + (seg.duration / 1000) + ",\n#EXT-X-PROGRAM-DATE-TIME:" + (this.tz(seg.ts_actual, "%FT%T.%3N%:z")) + "\n/" + this.stream.key + "/ts/" + seg.id + "." + this.stream.opts.format);
         this._segment_idx[seg.id] = seg;
       }
       b = this._segment_idx[seg.id].idx_buffer;
@@ -121,7 +121,7 @@ module.exports = HLSIndex = (function() {
 
   HLSIndex.prototype.short_index = function(session, cb) {
     var writer;
-    session = session ? new Buffer(session + "\n") : new Buffer("\n");
+    session = session ? Buffer.from(session + "\n") : Buffer.from("\n");
     if (!this._short_header) {
       return cb(null, null);
     }
@@ -131,7 +131,7 @@ module.exports = HLSIndex = (function() {
 
   HLSIndex.prototype.index = function(session, cb) {
     var writer;
-    session = session ? new Buffer(session + "\n") : new Buffer("\n");
+    session = session ? Buffer.from(session + "\n") : Buffer.from("\n");
     if (!this._header) {
       return cb(null, null);
     }

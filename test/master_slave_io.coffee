@@ -104,7 +104,7 @@ describe "Master/Slave IO", ->
 
         it "broadcasts audio data from master to slave", (done) ->
             k = "AUDIO"
-            chunk = { ts:new Date(), duration:0.1, data:new Buffer(100)}
+            chunk = { ts:new Date(), duration:0.1, data:Buffer.alloc(100)}
 
             slave.on "audio:#{k}", (rchunk) ->
                 expect(rchunk.ts).to.eql chunk.ts

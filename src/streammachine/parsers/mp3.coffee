@@ -182,7 +182,7 @@ module.exports = class MP3 extends require("stream").Writable
             # -- first header -- #
 
             if @gotFF and @byteTwo
-                buf = new Buffer(4)
+                buf = Buffer.alloc(4)
                 buf[0] = 0xFF
                 buf[1] = @byteTwo
                 buf[2] = v[0]
@@ -246,7 +246,7 @@ module.exports = class MP3 extends require("stream").Writable
                     return FIRST_BYTE
 
                 else if @gotID3 == 3
-                    @_id3v2_1 = new Buffer([0x49,0x44,0x33,v[0]])
+                    @_id3v2_1 = Buffer.from([0x49,0x44,0x33,v[0]])
                     @id3v2 = versionMajor:v[0]
                     @_parsingId3v2 = true
                     @gotID3 = 0
@@ -258,7 +258,7 @@ module.exports = class MP3 extends require("stream").Writable
             # -- data frame -- #
 
             if @frameHeaderBuf
-                frame = new Buffer( @frameHeaderBuf.length + v.length )
+                frame = Buffer.alloc( @frameHeaderBuf.length + v.length )
                 @frameHeaderBuf.copy(frame,0)
                 v.copy(frame,@frameHeaderBuf.length)
                 _emitAndMaybeEnd "frame", frame, @frameHeader

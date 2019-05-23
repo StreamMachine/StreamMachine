@@ -126,7 +126,7 @@ module.exports = class SourceIn extends require("events").EventEmitter
         [type,value] = header.split " "
 
         if type.toLowerCase() == "basic"
-            value = new Buffer(value, 'base64').toString('ascii')
+            value = Buffer.from(value, 'base64').toString('ascii')
             [user,pass] = value.split ":"
 
             if pass == stream_passwd

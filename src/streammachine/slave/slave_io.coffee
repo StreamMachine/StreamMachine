@@ -89,7 +89,7 @@ module.exports = class SlaveIO extends require("events").EventEmitter
         @io.on "audio", (obj) =>
             # our data gets converted into an ArrayBuffer to go over the
             # socket. convert it back before insertion
-            obj.chunk.data = new Buffer(obj.chunk.data)
+            obj.chunk.data = Buffer.from(obj.chunk.data)
 
             # convert timestamp back to a date object
             obj.chunk.ts = new Date(obj.chunk.ts)

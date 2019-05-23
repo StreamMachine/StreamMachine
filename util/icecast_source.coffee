@@ -22,7 +22,7 @@ class LoopingSource extends require('stream').Duplex
     constructor: (opts) ->
         @_reading = false
 
-        @_data = new Buffer 0
+        @_data = Buffer.alloc 0
         @_readPos = 0
 
         super opts
@@ -53,7 +53,7 @@ class LoopingSource extends require('stream').Duplex
             remaining = Math.min (@_data.length - @_readPos), size
 
             console.log "reading from #{ @_readPos } with #{ remaining }"
-            buf = new Buffer remaining
+            buf = Buffer.from remaining
             @_data.copy buf, 0, @_readPos, @_readPos.remaining
 
             @_readPos = @_readPos + remaining
@@ -118,7 +118,7 @@ sock = net.connect @args.port, @args.host, =>
 
     if @args.password
         # username doesn't matter.
-        auth = new Buffer("source:#{@args.password}",'ascii').toString("base64")
+        auth = Buffer.from("source:#{@args.password}",'ascii').toString("base64")
         sock.write "Authorization: basic #{auth}\r\n\r\n"
         console.log "Writing auth with #{ auth }."
 

@@ -25,7 +25,7 @@ LoopingSource = (function(_super) {
 
   function LoopingSource(opts) {
     this._reading = false;
-    this._data = new Buffer(0);
+    this._data = Buffer.alloc(0);
     this._readPos = 0;
     LoopingSource.__super__.constructor.call(this, opts);
   }
@@ -57,7 +57,7 @@ LoopingSource = (function(_super) {
         var buf, remaining;
         remaining = Math.min(_this._data.length - _this._readPos, size);
         console.log("reading from " + _this._readPos + " with " + remaining);
-        buf = new Buffer(remaining);
+        buf = Buffer.from(remaining);
         _this._data.copy(buf, 0, _this._readPos, _this._readPos.remaining);
         _this._readPos = _this._readPos + remaining;
         if (_this._readPos >= _this._data.length) {
@@ -123,7 +123,7 @@ sock = net.connect(this.args.port, this.args.host, (function(_this) {
     });
     sock.write("SOURCE /" + _this.args.stream + " ICE/1.0\r\n");
     if (_this.args.password) {
-      auth = new Buffer("source:" + _this.args.password, 'ascii').toString("base64");
+      auth = Buffer.from("source:" + _this.args.password, 'ascii').toString("base64");
       sock.write("Authorization: basic " + auth + "\r\n\r\n");
       console.log("Writing auth with " + auth + ".");
     }

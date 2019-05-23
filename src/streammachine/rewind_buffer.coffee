@@ -431,7 +431,7 @@ module.exports = class RewindBuffer extends require("events").EventEmitter
         _writeHeader: (cb) ->
             # -- Write header -- #
 
-            header_buf = new Buffer JSON.stringify
+            header_buf = Buffer.from JSON.stringify
                 start_ts:       @buf[0].ts
                 end_ts:         @buf[ @buf.length - 1 ].ts
                 secs_per_chunk: @secs
@@ -459,7 +459,7 @@ module.exports = class RewindBuffer extends require("events").EventEmitter
             loop
                 chunk = @buf[ @i ]
 
-                meta_buf = new Buffer JSON.stringify ts:chunk.ts, meta:chunk.meta, duration:chunk.duration
+                meta_buf = Buffer.from JSON.stringify ts:chunk.ts, meta:chunk.meta, duration:chunk.duration
 
                 # 1) metadata length
                 @c.uint8 meta_buf.length

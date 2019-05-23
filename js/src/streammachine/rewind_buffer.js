@@ -439,7 +439,7 @@ module.exports = RewindBuffer = (function(_super) {
 
     RewindWriter.prototype._writeHeader = function(cb) {
       var header_buf;
-      header_buf = new Buffer(JSON.stringify({
+      header_buf = Buffer.from(JSON.stringify({
         start_ts: this.buf[0].ts,
         end_ts: this.buf[this.buf.length - 1].ts,
         secs_per_chunk: this.secs,
@@ -460,7 +460,7 @@ module.exports = RewindBuffer = (function(_super) {
       wlen = 0;
       while (true) {
         chunk = this.buf[this.i];
-        meta_buf = new Buffer(JSON.stringify({
+        meta_buf = Buffer.from(JSON.stringify({
           ts: chunk.ts,
           meta: chunk.meta,
           duration: chunk.duration

@@ -119,7 +119,7 @@ module.exports = AAC = (function(_super) {
           }
         }
         if (_this.gotFF && _this.byteTwo) {
-          buf = new Buffer(2 + v.length);
+          buf = Buffer.alloc(2 + v.length);
           buf[0] = 0xFF;
           buf[1] = _this.byteTwo;
           v.copy(buf, 2);
@@ -173,7 +173,7 @@ module.exports = AAC = (function(_super) {
             _this.gotID3 = 3;
             return FIRST_BYTE;
           } else if (_this.gotID3 === 3) {
-            _this._id3v2_1 = new Buffer([0x49, 0x44, 0x33, v[0]]);
+            _this._id3v2_1 = Buffer.from([0x49, 0x44, 0x33, v[0]]);
             _this.id3v2 = {
               versionMajor: v[0]
             };
@@ -185,7 +185,7 @@ module.exports = AAC = (function(_super) {
           }
         }
         if (_this.frameHeaderBuf) {
-          frame = new Buffer(_this.frameHeaderBuf.length + v.length);
+          frame = Buffer.alloc(_this.frameHeaderBuf.length + v.length);
           _this.frameHeaderBuf.copy(frame, 0);
           v.copy(frame, _this.frameHeaderBuf.length);
           _emitAndMaybeEnd("frame", frame, _this.frameHeader);
