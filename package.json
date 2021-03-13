@@ -63,7 +63,7 @@
     "underscore": "~1.7.0",
     "watch-for-path": "~0.0.1",
     "winston": "~0.7.2",
-    "xmldom": "~0.1.27",
+    "xmldom": "~0.5.0",
     "xpath": "~0.0.9",
     "yargs": "~3.18"
   },
