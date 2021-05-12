@@ -45,7 +45,7 @@
     "mincer": "~0.5.6",
     "nconf": "~0.6.7",
     "node-uuid": "~1.4.0",
-    "nodemailer": "~0.4.1",
+    "nodemailer": "~6.4.16",
     "pagerduty": "~0.0.3",
     "passport": "~0.1.17",
     "passport-http": "~0.2.1",
